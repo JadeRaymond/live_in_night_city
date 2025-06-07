@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Document Code Generator</title>
+<link rel="stylesheet" href="document-code-generator.css">
+</head>
+<body>
+<div class="container">
+    <form id="codeForm" autocomplete="off">
+        <label for="aoc">AOC:</label>
+        <select id="aoc" required>
+            <option value="">— Select AOC —</option>
+            <option value="KC">KC (Air Astana)</option>
+            <option value="FS">FS (FlyArystan)</option>
+            <option value="GRP">GROUP (All AOCs)</option>
+        </select>
+
+    <label for="department">Department:</label>
+    <input id="department" type="text" placeholder="Enter department" pattern="[A-Z0-9]{2,}" required />
+
+    <label for="subDepartment">Division (optional):</label>
+    <input id="subDepartment" type="text" placeholder="Enter division (optional)" pattern="[A-Z0-9]{2,}" title="Provide an optional sub division (uppercase letters and numbers, no spaces or special characters)." />
+
+    <label for="subSubDepartment">Unit (optional):</label>
+    <input id="subSubDepartment" type="text" placeholder="Enter unit (optional)" pattern="[A-Z0-9]{2,}" title="Provide an optional unit (uppercase letters and numbers, no spaces or special characters)." />
+
+    <label for="docType">Document Type:</label>
+    <select id="docType" required>
+            <option value="AC">Attestation Commission (AC)</option>
+            <option value="AOI">Air Safety Information (ASI)</option>
+            <option value="AR">Audit Report (AR)</option>
+            <option value="BUL">Bulletin (BUL)</option>
+            <option value="CC">Compliance Checklist (CC)</option>
+            <option value="CCN">Cabin Crew Notice (CCN)</option>
+            <option value="CHK">Checklist (CHK)</option>
+            <option value="CL">Contact List (CL)</option>
+            <option value="CN">Company Notice (CN)</option>
+            <option value="DATA">Data Sheet / Specification (DS)</option>
+            <option value="DISC">Disciplinary (DISC)</option>
+            <option value="EB">Engineering Bulletin (EB)</option>
+            <option value="EO">Engineering Order (EO)</option>
+            <option value="EP">Emergency Procedure (EP)</option>
+            <option value="FCB">Flight Crew Briefing (FCB)</option>
+            <option value="FOB">Flight Operations Bulletin (FOB)</option>
+            <option value="FORM">Form (FORM)</option>
+            <option value="GDE">Guide (GDE)</option>
+            <option value="GOI">Ground Operations Instruction (GOI)</option>
+            <option value="INF">Information Notice (INF)</option>
+            <option value="INS">Instruction (INS)</option>
+            <option value="JA">Job Aid (JA)</option>
+            <option value="MAN">Manual (MAN)</option>
+            <option value="MEMO">Memo (MEMO)</option>
+            <option value="MI">Maintenance Instruction (MI)</option>
+            <option value="MN">Maintenance Notice (MN)</option>
+            <option value="MR">Mandatory Read (MR)</option>
+            <option value="NCM">Non-Compliance Memo (NCM)</option>
+            <option value="NOT">Notice (NOT)</option>
+            <option value="OEM">OEM Document (OEM)</option>
+            <option value="OEMCN">OEM Compliance Notice (OEMCN)</option>
+            <option value="OEMIN">OEM Instruction (OEMIN)</option>
+            <option value="OI">Operational Instruction (OI)</option>
+            <option value="POL">Policy (POL)</option>
+            <option value="PROM">Promotion (PROM)</option>
+            <option value="QP">Quality Procedure (QP)</option>
+            <option value="RA">Risk Assessment (RA)</option>
+            <option value="RECO">Recognition (RECO)</option>
+            <option value="REG">Regulation (REG)</option>
+            <option value="RPT">Report (RPT)</option>
+            <option value="SB">Safety Bulletin (SB)</option>
+            <option value="SN">Safety Notice (SN)</option>
+            <option value="SOP">Standard Operating Procedure (SOP)</option>
+            <option value="SVCN">Service Notice (SVCN)</option>
+            <option value="TI">Technical Instruction (TI)</option>
+            <option value="TIN">Technical Information News (TIN)</option>
+            <option value="TPL">Training Plan (TPL)</option>
+            <option value="TRM">Training Material (TRM)</option>
+            <option value="UG">User Guide (UG)</option>
+            <option value="WI">Work Instruction (WI)</option>
+    </select>
+
+    <label for="extraField">Optional Text:</label>
+    <input id="extraField" type="text" placeholder="Enter additional identifier (e.g., version or code)" pattern="[A-Z0-9]+(-[A-Z0-9]+)*" title="Provide an optional identifier such as a version number or additional code." />
+
+    <button type="submit">Generate Code</button>
+</form>
+
+<div id="errorBox" class="error-box" style="display:none;">
+    <div class="error-title">Code Generation Error</div>
+    <div id="errorMessage" class="error-message"></div>
+    <div id="errorRecommendation" class="error-recommendation"></div>
+</div>
+
+<div id="codeOutputBox">
+    <div id="codeOutputLabel">Generated Code:</div>
+    <span id="codeOutput" class="code-output"></span>
+</div>
+
+<script src="document-code-generator.js"></script>
+</body>
+</html>
