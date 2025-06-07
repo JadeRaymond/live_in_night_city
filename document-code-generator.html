@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Document Code Generator</title>
+<style>
+    .visible-error {
+        display: block !important;
+    }
+        :root {
+            --box-shadow-soft: 0 4px 10px rgba(0, 0, 0, 0.05);
+            --button-bg-color: #004785;
+            --button-text-color: #fff;
+            --button-hover-bg-color: #003366;
+            --output-text-color: #cc0033;
+            --border-width: 1px;
+            --border-color: #ccc;
+            --border-radius: 6px;
+            --error-bg: #f8d7da;
+            --error-border: #e63946;
+            --error-title-bg: var(--error-border);
+            --error-title-text-color: #fff;
+        }
+    body {
+        background: #f7f9fb;
+        font-family: 'Segoe UI', Arial, sans-serif;
+        margin: 0;
+        padding: 40px 0;
+        min-height: 100vh;
+    }
+    .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    form {
+        background: #fff;
+        padding: 24px 32px;
+        border-radius: 10px;
+        max-width: 480px;
+        width: 100%;
+        box-shadow: var(--box-shadow-soft);
+        margin-bottom: 24px;
+    }
+    label {
+        font-weight: 600;
+        margin-top: 12px;
+        display: block;
+        color: #333;
+        border: none;
+        border-radius: var(--border-radius);
+    }
+    select, input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        margin-top: 4px;
+        margin-bottom: 16px;
+        border: var(--border-width) solid var(--border-color);
+        border-radius: var(--border-radius);
+        font-size: 15px;
+        background: #f9fafb;
+        transition: border-color 0.2s;
+    }
+    select:focus, input[type="text"]:focus {
+        border-color: #004785;
+        outline: none;
+    }
+    button {
+        background-color: var(--button-bg-color);
+        color: var(--button-text-color);
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.2s;
+        margin-top: 8px;
+        width: 100%;
+    }
+    button:hover {
+        background-color: var(--button-hover-bg-color);
+    }
+    .output {
+        font-size: 18px;
+        margin-top: 16px;
+        background: #fff;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: var(--box-shadow-light);
+        min-width: 320px;
+        text-align: center;
+    }
+    #codeOutputBox {
+        margin-top: 32px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: var(--box-shadow-light);
+        padding: 20px 32px;
+        min-width: 340px;
+        max-width: 520px;
+        text-align: center;
+        border: 2px solid #e0e0e0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    #codeOutputLabel {
+        font-weight: bold;
+        font-size: 18px;
+        color: #444;
+        margin-bottom: 8px;
+    }
+    #codeOutput {
+        font-weight: bold;
+        color: var(--output-text-color);
+        word-break: break-all;
+        font-size: 20px;
+        letter-spacing: 1px;
+    }
+    .error-box {
+        display: block;
+        background: var(--error-bg);
+        border: 2px solid var(--error-border);
+        border-radius: 8px;
+        max-width: 480px;
+        margin: 0 auto 18px auto;
+        box-shadow: 0 2px 8px rgba(204,0,51,0.07);
+        padding: 0 0 12px 0;
+    }
+    .error-title {
+        background: var(--error-title-bg);
+        color: var(--error-title-text-color);
+        font-weight: bold;
+        font-size: 18px;
+        padding: 10px 18px;
+        border-radius: 8px 8px 0 0;
+    }
+    .error-message {
+        color: #cc0033;
+        font-size: 16px;
+        padding: 10px 18px 0 18px;
+        font-weight: 500;
+    }
+    .error-recommendation {
+        color: #333;
+        font-size: 15px;
+        padding: 8px 18px 0 18px;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <form id="codeForm" autocomplete="off">
+        <label for="aoc">AOC:</label>
+        <select id="aoc" required>
+            <option value="">— Select AOC —</option>
+            <option value="KC">KC (Air Astana)</option>
+            <option value="FS">FS (FlyArystan)</option>
+            <option value="GRP">GROUP (All AOCs)</option>
+        </select>
+
+    <label for="department">Department:</label>
+    <input id="department" type="text" placeholder="Enter department" required />
+
+    <label for="subDepartment">Division (optional):</label>
+    <input id="subDepartment" type="text" placeholder="Enter division (optional)" title="Provide an optional sub division (uppercase letters and numbers, no spaces or special characters)." />
+
+    <label for="subSubDepartment">Unit (optional):</label>
+    <input id="subSubDepartment" type="text" placeholder="Enter unit (optional)" title="Provide an optional unit (uppercase letters and numbers, no spaces or special characters)." />
+
+    <label for="docType">Document Type:</label>
+    <select id="docType" required>
+            <option value="AC">Attestation Commission (AC)</option>
+            <option value="AOI">Air Safety Information (ASI)</option>
+            <option value="AR">Audit Report (AR)</option>
+            <option value="BUL">Bulletin (BUL)</option>
+            <option value="CC">Compliance Checklist (CC)</option>
+            <option value="CCN">Cabin Crew Notice (CCN)</option>
+            <option value="CHK">Checklist (CHK)</option>
+            <option value="CL">Contact List (CL)</option>
+            <option value="CN">Company Notice (CN)</option>
+            <option value="DATA">Data Sheet / Specification (DS)</option>
+            <option value="DISC">Disciplinary (DISC)</option>
+            <option value="EB">Engineering Bulletin (EB)</option>
+            <option value="EO">Engineering Order (EO)</option>
+            <option value="EP">Emergency Procedure (EP)</option>
+            <option value="FCB">Flight Crew Briefing (FCB)</option>
+            <option value="FOB">Flight Operations Bulletin (FOB)</option>
+            <option value="FORM">Form (FORM)</option>
+            <option value="GDE">Guide (GDE)</option>
+            <option value="GOI">Ground Operations Instruction (GOI)</option>
+            <option value="INF">Information Notice (INF)</option>
+            <option value="INS">Instruction (INS)</option>
+            <option value="JA">Job Aid (JA)</option>
+            <option value="MAN">Manual (MAN)</option>
+            <option value="MEMO">Memo (MEMO)</option>
+            <option value="MI">Maintenance Instruction (MI)</option>
+            <option value="MN">Maintenance Notice (MN)</option>
+            <option value="MR">Mandatory Read (MR)</option>
+            <option value="NCM">Non-Compliance Memo (NCM)</option>
+            <option value="NOT">Notice (NOT)</option>
+            <option value="OEM">OEM Document (OEM)</option>
+            <option value="OEMCN">OEM Compliance Notice (OEMCN)</option>
+            <option value="OEMIN">OEM Instruction (OEMIN)</option>
+            <option value="OI">Operational Instruction (OI)</option>
+            <option value="POL">Policy (POL)</option>
+            <option value="PROM">Promotion (PROM)</option>
+            <option value="QP">Quality Procedure (QP)</option>
+            <option value="RA">Risk Assessment (RA)</option>
+            <option value="RECO">Recognition (RECO)</option>
+            <option value="REG">Regulation (REG)</option>
+            <option value="RPT">Report (RPT)</option>
+            <option value="SB">Safety Bulletin (SB)</option>
+            <option value="SN">Safety Notice (SN)</option>
+            <option value="SOP">Standard Operating Procedure (SOP)</option>
+            <option value="SVCN">Service Notice (SVCN)</option>
+            <option value="TI">Technical Instruction (TI)</option>
+            <option value="TIN">Technical Information News (TIN)</option>
+            <option value="TPL">Training Plan (TPL)</option>
+            <option value="TRM">Training Material (TRM)</option>
+            <option value="UG">User Guide (UG)</option>
+            <option value="WI">Work Instruction (WI)</option>
+    </select>
+
+    <label for="extraField">Optional Text:</label>
+    <input id="extraField" type="text" placeholder="Enter additional identifier (e.g., version or code)" title="Provide an optional identifier such as a version number or additional code." />
+
+    <button type="submit">Generate Code</button>
+</form>
+
+<div id="errorBox" class="error-box" style="display:none;">
+    <div class="error-title">Code Generation Error</div>
+    <div id="errorMessage" class="error-message"></div>
+    <div id="errorRecommendation" class="error-recommendation"></div>
+</div>
+
+<div id="codeOutputBox">
+    <div id="codeOutputLabel">Generated Code:</div>
+    <span id="codeOutput" class="code-output"></span>
+</div>
+
+<script>
+// Updated regex: allow 0-2 optional sub-departments (each 2+ chars), e.g. AOC-DEPT-SUB-SUBSUB-TYPE-EXTRA
+const DOCUMENT_CODE_PATTERN = /^[A-Z]{2,5}-[A-Z0-9]{2,}(?:-[A-Z0-9]{2,}){0,2}-[A-Z]{2,8}(?:-[A-Z0-9]+)*$/;
+
+document.getElementById('codeForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    generateCode();
+});
+
+function validateInputs() {
+    const inputs = {
+        aoc: document.getElementById('aoc').value.trim().toUpperCase(),
+        deptInput: document.getElementById('department').value.trim().toUpperCase(),
+        subDeptInput: document.getElementById('subDepartment').value.trim().toUpperCase(),
+        subSubDeptInput: document.getElementById('subSubDepartment').value.trim().toUpperCase(),
+        type: document.getElementById('docType').value.trim().toUpperCase(),
+        extraInput: document.getElementById('extraField').value.trim().toUpperCase()
+    };
+
+    let missingInputs = [];
+    if (!inputs.aoc) missingInputs.push("AOC");
+    if (!inputs.deptInput) {
+        missingInputs.push("Department");
+    } else if (inputs.deptInput.length < 2 || !/^[A-Z0-9]+$/.test(inputs.deptInput) || /\s|[^A-Z0-9]/.test(inputs.deptInput)) {
+        missingInputs.push("Department (must be at least 2 uppercase alphanumeric characters without spaces or special characters)");
+    }
+    if (inputs.subDeptInput && (inputs.subDeptInput.length < 2 || !/^[A-Z0-9]+$/.test(inputs.subDeptInput) || /\s|[^A-Z0-9]/.test(inputs.subDeptInput))) {
+        missingInputs.push("Division (must be at least 2 uppercase alphanumeric characters without spaces or special characters)");
+    }
+    if (inputs.subSubDeptInput && (inputs.subSubDeptInput.length < 2 || !/^[A-Z0-9]+$/.test(inputs.subSubDeptInput) || /\s|[^A-Z0-9]/.test(inputs.subSubDeptInput))) {
+        missingInputs.push("Unit (must be at least 2 uppercase alphanumeric characters without spaces or special characters)");
+    }
+    if (!inputs.type) missingInputs.push("Document Type");
+
+    return { ...inputs, missingInputs };
+}
+
+function displayCode(code, missingInputs, error) {
+    const codeOutput = document.getElementById('codeOutput');
+    const errorBox = document.getElementById('errorBox');
+    const errorMessage = document.getElementById('errorMessage');
+    const errorRecommendation = document.getElementById('errorRecommendation');
+    const errorBoxClass = 'visible-error';
+    const extraField = document.getElementById('extraField');
+    const subDeptField = document.getElementById('subDepartment');
+    const subSubDeptField = document.getElementById('subSubDepartment');
+
+    // Reset field borders
+    extraField.style.borderColor = '';
+    subDeptField.style.borderColor = '';
+    subSubDeptField.style.borderColor = '';
+
+    if (missingInputs && missingInputs.length > 0) {
+        codeOutput.textContent = '';
+        errorBox.style.display = 'block';
+        errorBox.classList.add(errorBoxClass);
+        errorMessage.textContent = `Missing fields: ${missingInputs.join(", ")}`;
+        errorRecommendation.textContent = "Please fill in all required fields and try again.";
+        // Highlight subDepartment/subSubDepartment if error
+        if (missingInputs.some(msg => msg.startsWith('Sub Department'))) {
+            subDeptField.style.borderColor = '#cc0033';
+        }
+        if (missingInputs.some(msg => msg.startsWith('Sub Sub Department'))) {
+            subSubDeptField.style.borderColor = '#cc0033';
+        }
+    } else if (error) {
+        codeOutput.textContent = '';
+        errorBox.style.display = 'block';
+        errorBox.classList.add(errorBoxClass);
+        if (error.type === 'ValidationError') {
+            errorMessage.textContent = error.message;
+            errorRecommendation.textContent = "Recommendations:\n" +
+                "- Optional text: only uppercase Latin letters, numbers, or dashes\n" +
+                "- Sub Department: only uppercase Latin letters and numbers, at least 2 characters\n" +
+                "- Sub Sub Department: only uppercase Latin letters and numbers, at least 2 characters\n" +
+                "Please correct the highlighted field below.";
+            if (error.field === 'extraField') {
+                extraField.style.borderColor = '#cc0033';
+            }
+            if (error.field === 'subDepartment') {
+                subDeptField.style.borderColor = '#cc0033';
+            }
+            if (error.field === 'subSubDepartment') {
+                subSubDeptField.style.borderColor = '#cc0033';
+            }
+        } else {
+            errorMessage.textContent = "An unexpected error occurred.";
+            errorRecommendation.textContent = "Please try again later or contact support.";
+        }
+    } else {
+        errorBox.style.display = 'none';
+        errorBox.classList.remove(errorBoxClass);
+        errorRecommendation.textContent = '';
+        codeOutput.textContent = code;
+    }
+}
+
+// Helper to transform inputs by trimming and converting to uppercase
+function transformInputs({ aoc, deptInput, subDeptInput, subSubDeptInput, type, extraInput }) {
+    return {
+        dept: deptInput,
+        subDept: subDeptInput,
+        subSubDept: subSubDeptInput,
+        extra: extraInput
+    };
+}
+
+function validateCodeFormat(code, extra, subDept, subSubDept) {
+    let errors = [];
+    if (subDept && !/^[A-Z0-9]{2,}$/.test(subDept)) {
+        errors.push('Sub Department: only uppercase letters and numbers, at least 2 characters');
+    }
+    if (subSubDept && !/^[A-Z0-9]{2,}$/.test(subSubDept)) {
+        errors.push('Sub Sub Department: only uppercase letters and numbers, at least 2 characters');
+    }
+    if (extra && !/^[A-Z0-9]+(-[A-Z0-9]+)*$/.test(extra)) {
+        errors.push('Optional text: only uppercase letters, numbers, or dashes');
+    }
+    if (!DOCUMENT_CODE_PATTERN.test(code)) {
+        errors.push(`Generated code format is invalid. Invalid code: ${code}`);
+    }
+    if (errors.length > 0) {
+        const error = new Error(errors.join('\n'));
+        if (errors[0].startsWith('Sub Department')) error.field = 'subDepartment';
+        if (errors[0].startsWith('Sub Sub Department')) error.field = 'subSubDepartment';
+        if (errors[0].startsWith('Optional text')) error.field = 'extraField';
+        error.type = 'ValidationError';
+        throw error;
+    }
+}
+
+function generateDocumentCode(aoc, dept, subDept, subSubDept, type, extra) {
+    let code = `${aoc}-${dept}`;
+    if (subDept) {
+        code += `-${subDept}`;
+    }
+    if (subSubDept) {
+        code += `-${subSubDept}`;
+    }
+    code += `-${type}`;
+    if (extra) {
+        // Only allow uppercase letters, numbers, or dashes in extra
+        if (!/^[A-Z0-9]+(-[A-Z0-9]+)*$/.test(extra)) {
+            const error = new Error('Optional text must contain only uppercase letters, numbers, or dashes');
+            error.type = 'ValidationError';
+            error.field = 'extraField';
+            throw error;
+        }
+        code += `-${extra}`;
+    }
+    try {
+        validateCodeFormat(code, extra, subDept, subSubDept);
+    } catch (err) {
+        throw err;
+    }
+    return code;
+}
+
+// Main code to handle form submission
+function generateCode() {
+    const { aoc, deptInput, subDeptInput, subSubDeptInput, type, extraInput, missingInputs } = validateInputs();
+    if (missingInputs.length > 0) {
+        displayCode('', missingInputs, null);
+        return;
+    }
+    const { dept, subDept, subSubDept, extra } = transformInputs({ aoc, deptInput, subDeptInput, subSubDeptInput, type, extraInput });
+    try {
+        const code = generateDocumentCode(aoc, dept, subDept, subSubDept, type, extra);
+        displayCode(code, [], null);
+    } catch (err) {
+        displayCode('', [], err);
+    }
+}
+</script>
+</body>
+</html>
