@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<title>Определение Role</title>
+<link rel="stylesheet" href="role-determiner.css">
+</head>
+<body>
+<div class="container">
+    <h2>Определение Role на основе Airline, Department и Organization</h2>
+    <form id="roleForm">
+        <label for="airline">Airline Name <span style="color:red">*</span></label>
+        <select id="airline" required>
+            <option value="">— Выберите Airline —</option>
+            <option value="Air Astana">Air Astana</option>
+            <option value="FlyArystan">FlyArystan</option>
+        </select>
+
+        <label for="department">Department <span style="color:red">*</span></label>
+        <select id="department" required>
+            <option value="">— Выберите Department —</option>
+            <option value="Administration">Administration</option>
+            <option value="Aviation Security Department">Aviation Security Department</option>
+            <option value="Aviation security">Aviation security</option>
+            <option value="Business Planning and Fleet Portfolio Department">Business Planning and Fleet Portfolio Department</option>
+            <option value="Cargo Department">Cargo Department</option>
+            <option value="Chief Executive Officer's Office">Chief Executive Officer's Office</option>
+            <option value="Compliance Service">Compliance Service</option>
+            <option value="Corporate Communications Department">Corporate Communications Department</option>
+            <option value="Corporate Safety Compliance Department">Corporate Safety Compliance Department</option>
+            <option value="Corporate Secretary">Corporate Secretary</option>
+            <option value="Corporate Secretary Service">Corporate Secretary Service</option>
+            <option value="Crew Training">Crew Training</option>
+            <option value="Department Government Relations">Department Government Relations</option>
+            <option value="Engineering Department">Engineering Department</option>
+            <option value="Engineering and Maintenance Department">Engineering and Maintenance Department</option>
+            <option value="Engineering and maintenance">Engineering and maintenance</option>
+            <option value="Finance">Finance</option>
+            <option value="Finance  department">Finance  department</option>
+            <option value="Finance group">Finance group</option>
+            <option value="Flight Operations Control">Flight Operations Control</option>
+            <option value="Flight Operations Department">Flight Operations Department</option>
+            <option value="Flight operations">Flight operations</option>
+            <option value="Fly Arystan Administration">Fly Arystan Administration</option>
+            <option value="Fly Arystan Department">Fly Arystan Department</option>
+            <option value="Fuel Management Department">Fuel Management Department</option>
+            <option value="Fuel Management/">Fuel Management/</option>
+            <option value="Ground Services Department">Ground Services Department</option>
+            <option value="Ground services">Ground services</option>
+            <option value="Ground services Fly Arystan">Ground services Fly Arystan</option>
+            <option value="Human Resources and Administration">Human Resources and Administration</option>
+            <option value="Human resources">Human resources</option>
+            <option value="IT and e-Business Department">IT and e-Business Department</option>
+            <option value="In-flight Magazine">In-flight Magazine</option>
+            <option value="Inflight Services Department">Inflight Services Department</option>
+            <option value="Internal Audit Service">Internal Audit Service</option>
+            <option value="Internal Control division">Internal Control division</option>
+            <option value="Investors Relations Office">Investors Relations Office</option>
+            <option value="Legal Department">Legal Department</option>
+            <option value="Maintenance Department">Maintenance Department</option>
+            <option value="Management Accounts and Risk Management">Management Accounts and Risk Management</option>
+            <option value="Network Planning">Network Planning</option>
+            <option value="Network Revenue Management and Commercial Planning">Network Revenue Management and Commercial Planning</option>
+            <option value="Operations">Operations</option>
+            <option value="Procurement and Supply Department">Procurement and Supply Department</option>
+            <option value="Project Portfolio and Business Development Office">Project Portfolio and Business Development Office</option>
+            <option value="Public Relations">Public Relations</option>
+            <option value="Resource Planning Department">Resource Planning Department</option>
+            <option value="Revenue Management">Revenue Management</option>
+            <option value="Safety Compliance Department">Safety Compliance Department</option>
+            <option value="Sales and Marketing Department">Sales and Marketing Department</option>
+            <option value="Sustainability Department">Sustainability Department</option>
+            <option value="Training Academy">Training Academy</option>
+        </select>
+
+        <label for="organization">Organization (необязательно)</label>
+        <select id="organization">
+            <option value="">— Выберите Organization —</option>
+        </select>
+
+        <label for="role">Значение Role</label>
+        <input type="text" id="role" readonly placeholder="Пока не определено">
+
+        <button type="button" id="resetBtn">Сбросить</button>
+    </form>
+</div>
+<script src="role-determiner.js"></script>
+</body>
+</html>
