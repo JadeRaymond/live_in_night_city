@@ -137,6 +137,45 @@ document.getElementById('filterPlayer').addEventListener('change', e => {
   renderMatchHistory(document.getElementById('filterDate').value, e.target.value);
 });
 
+function exportData() {
+  const data = { players, matchHistory };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'pingpong_data.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showNotification('Data saved');
+}
+
+document.getElementById('importFile').addEventListener('change', function (e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = event => {
+    try {
+      const data = JSON.parse(event.target.result);
+      if (data.players && data.matchHistory) {
+        players = data.players;
+        matchHistory = data.matchHistory;
+        saveData();
+        populateDropdowns();
+        renderLeaderboard();
+        renderMatchHistory();
+        renderTopPlayer();
+        showNotification('Data loaded');
+      } else {
+        alert('Invalid data file');
+      }
+    } catch (err) {
+      alert('Failed to load data');
+    }
+  };
+  reader.readAsText(file);
+  this.value = '';
+});
+
 renderLeaderboard();
 renderMatchHistory();
 renderTopPlayer();
