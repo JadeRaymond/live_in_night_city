@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TSD Ping Pong Pro Tracker 🏓</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>TSD Ping Pong Pro Tracker 🏓</h1>
+
+    <div class="section" id="leaderboard-section">
+      <h2>Leaderboard</h2>
+      <table>
+        <thead>
+          <tr><th>Player</th><th>Wins</th><th>Losses</th><th>Win Rate</th><th>Elo</th><th>Matches Played</th></tr>
+        </thead>
+        <tbody id="leaderboard"></tbody>
+      </table>
+    </div>
+
+    <div class="section" id="top-player-section">
+      <h2>Top Player</h2>
+      <div id="topPlayer" class="top-player"></div>
+    </div>
+
+    <div class="section" id="match-history-section">
+      <h2>Match History</h2>
+      <div class="flex-row">
+        <div>
+          <label for="filterDate">Filter by Date</label>
+          <input type="date" id="filterDate" />
+        </div>
+        <div>
+          <label for="filterPlayer">Filter by Player</label>
+          <select id="filterPlayer"><option value="">-- All Players --</option></select>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Player 1</th><th>Score</th><th>Player 2</th></tr>
+        </thead>
+        <tbody id="matchHistory"></tbody>
+      </table>
+    </div>
+
+    <div class="section" id="add-section">
+      <h2>Add Match / Player</h2>
+      <div class="player-actions">
+        <input type="text" id="newPlayerName" placeholder="New player name" />
+        <button class="btn-primary" onclick="addPlayer()">Add Player</button>
+        <button class="btn-danger" onclick="resetPlayers()">Reset All</button>
+      </div>
+      <div class="flex-row">
+        <div>
+          <label for="player1">Player 1</label>
+          <select id="player1"></select>
+        </div>
+        <div>
+          <label for="player2">Player 2</label>
+          <select id="player2"></select>
+        </div>
+      </div>
+      <div class="flex-row">
+        <div>
+          <label for="score1">Score Player 1</label>
+          <input type="number" id="score1" min="0" placeholder="Score Player 1" />
+        </div>
+        <div>
+          <label for="score2">Score Player 2</label>
+          <input type="number" id="score2" min="0" placeholder="Score Player 2" />
+        </div>
+      </div>
+      <button class="btn-primary" id="addMatchBtn">Add Match</button>
+    </div>
+  </div>
+
+  <div id="notification"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
