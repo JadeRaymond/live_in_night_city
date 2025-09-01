@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TSD Ping Pong Pro Tracker 🏓</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  margin: 0;
+  padding: 20px;
+  background: #f4f7fc;
+  color: #1a1a1a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  background: #ffffff;
+  padding: 15px 20px;
+  border-radius: 14px;
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e2e8f0;
+}
+
+h1,
+h2 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  user-select: text;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-top: 10px;
+  color: #4a5568;
+  user-select: text;
+}
+
+input,
+select {
+  width: 95%;
+  padding: 4px 6px;
+  margin-top: 8px;
+  margin-bottom: 20px;
+  border: 1.5px solid #cbd5e0;
+  border-radius: 10px;
+  font-size: 15px;
+  background-color: #f9fafb;
+  color: #2d3748;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  cursor: pointer;
+}
+
+input:focus,
+select:focus {
+  border-color: #3182ce;
+  outline: none;
+  box-shadow: 0 0 8px rgba(49, 130, 206, 0.4);
+  background-color: #fff;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 1px;
+  padding: 6px 28px;
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #4299e1, #2b6cb0);
+  box-shadow: 0 6px 18px rgba(66, 153, 225, 0.4);
+  transition: background 0.3s ease, transform 0.15s ease, box-shadow 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  margin-top: 5px;
+}
+
+button:hover {
+  background: linear-gradient(135deg, #2b6cb0, #3182ce);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(49, 130, 206, 0.6);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #e53e3e, #c53030);
+  box-shadow: 0 6px 18px rgba(229, 62, 62, 0.5);
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #9b2c2c, #c53030);
+  box-shadow: 0 12px 30px rgba(155, 44, 44, 0.7);
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 6 6px;
+  margin-top: 5px;
+  font-size: 14.5px;
+  user-select: text;
+}
+
+th,
+td {
+  background: #edf2f7;
+  padding: 3px 3px;
+  text-align: center;
+  color: #2d3748;
+  border-radius: 50px;
+}
+
+th {
+  background: #f9fafb;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 3px solid #dcd4cb;
+}
+
+tbody tr:hover td {
+  background-color: #f4b790;
+  color: #1a202c;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.section {
+  margin-bottom: 4rem;
+}
+
+.flex-row {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.flex-row > * {
+  flex: 1 1 110px;
+}
+
+#notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #3182ce;
+  color: white;
+  padding: 7px 12px;
+  border-radius: 14px;
+  box-shadow: 0 8px 26px rgba(49, 130, 206, 0.7);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  font-weight: 600;
+  z-index: 9999;
+}
+
+#notification.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+ (max-width: 640px) {
+  .flex-row {
+    flex-direction: column;
+  }
+  button {
+    width: 100%;
+  }
+}
+
+.player-actions {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.top-player {
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-align: center;
+}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TSD Ping Pong Pro Tracker 🏓</h1>
+
+    <div class="section" id="leaderboard-section">
+      <h2>Leaderboard</h2>
+      <table>
+        <thead>
+          <tr><th>Player</th><th>Wins</th><th>Losses</th><th>Win Rate</th><th>Elo</th><th>Matches Played</th></tr>
+        </thead>
+        <tbody id="leaderboard"></tbody>
+      </table>
+    </div>
+
+    <div class="section" id="top-player-section">
+      <h2>Top Player</h2>
+      <div id="topPlayer" class="top-player"></div>
+    </div>
+
+    <div class="section" id="match-history-section">
+      <h2>Match History</h2>
+      <div class="flex-row">
+        <div>
+          <label for="filterDate">Filter by Date</label>
+          <input type="date" id="filterDate" />
+        </div>
+        <div>
+          <label for="filterPlayer">Filter by Player</label>
+          <select id="filterPlayer"><option value="">-- All Players --</option></select>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Player 1</th><th>Score</th><th>Player 2</th></tr>
+        </thead>
+        <tbody id="matchHistory"></tbody>
+      </table>
+    </div>
+
+    <div class="section" id="add-section">
+      <h2>Add Match / Player</h2>
+      <div class="player-actions">
+        <input type="text" id="newPlayerName" placeholder="New player name" />
+        <button class="btn-primary" onclick="addPlayer()">Add Player</button>
+        <button class="btn-danger" onclick="resetPlayers()">Reset All</button>
+      </div>
+      <div class="flex-row">
+        <div>
+          <label for="player1">Player 1</label>
+          <select id="player1"></select>
+        </div>
+        <div>
+          <label for="player2">Player 2</label>
+          <select id="player2"></select>
+        </div>
+      </div>
+      <div class="flex-row">
+        <div>
+          <label for="score1">Score Player 1</label>
+          <input type="number" id="score1" min="0" placeholder="Score Player 1" />
+        </div>
+        <div>
+          <label for="score2">Score Player 2</label>
+          <input type="number" id="score2" min="0" placeholder="Score Player 2" />
+        </div>
+      </div>
+      <button class="btn-primary" id="addMatchBtn">Add Match</button>
+    </div>
+
+    <div class="section" id="data-section">
+      <h2>Save / Load Data</h2>
+      <div class="player-actions">
+        <button class="btn-primary" onclick="exportData()">Save to File</button>
+        <input type="file" id="importFile" accept=".json" style="display:none">
+        <button class="btn-primary" onclick="document.getElementById('importFile').click()">Load from File</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notification"></div>
+
+  <script>
+    let players = JSON.parse(localStorage.getItem('pingPongPlayers') || '{}');
+let matchHistory = JSON.parse(localStorage.getItem('pingPongMatches') || '[]');
+
+function saveData() {
+  localStorage.setItem('pingPongPlayers', JSON.stringify(players));
+  localStorage.setItem('pingPongMatches', JSON.stringify(matchHistory));
+}
+
+function showNotification(message) {
+  const notif = document.getElementById('notification');
+  notif.textContent = message;
+  notif.classList.add('show');
+  setTimeout(() => notif.classList.remove('show'), 2000);
+}
+
+function addPlayer() {
+  const name = document.getElementById('newPlayerName').value.trim();
+  if (!name) return alert('Enter player name');
+  if (players[name]) return alert('Player already exists');
+  players[name] = { wins: 0, losses: 0, elo: 1000 };
+  saveData();
+  populateDropdowns();
+  renderLeaderboard();
+  showNotification(`Player "${name}" added.`);
+  document.getElementById('newPlayerName').value = '';
+}
+
+function resetPlayers() {
+  if (!confirm('Are you sure you want to reset all data?')) return;
+  localStorage.removeItem('pingPongPlayers');
+  localStorage.removeItem('pingPongMatches');
+  players = {};
+  matchHistory = [];
+  renderLeaderboard();
+  renderMatchHistory();
+  populateDropdowns();
+  renderTopPlayer();
+  showNotification('All data reset');
+}
+
+function addMatch() {
+  const p1 = document.getElementById('player1').value;
+  const p2 = document.getElementById('player2').value;
+  const s1 = parseInt(document.getElementById('score1').value);
+  const s2 = parseInt(document.getElementById('score2').value);
+  const today = new Date().toISOString().split('T')[0];
+
+  if (!p1 || !p2 || p1 === p2 || isNaN(s1) || isNaN(s2)) {
+    return alert('Fill all match fields correctly');
+  }
+
+  matchHistory.push({ date: today, player1: p1, score1: s1, player2: p2, score2: s2 });
+
+  if (s1 > s2) {
+    players[p1].wins++;
+    players[p2].losses++;
+  } else if (s2 > s1) {
+    players[p2].wins++;
+    players[p1].losses++;
+  }
+
+  saveData();
+  renderLeaderboard();
+  renderMatchHistory();
+  renderTopPlayer();
+  showNotification('Match added');
+  document.getElementById('score1').value = '';
+  document.getElementById('score2').value = '';
+}
+
+function renderLeaderboard() {
+  const tbody = document.getElementById('leaderboard');
+  tbody.innerHTML = '';
+  const sorted = Object.entries(players).sort(([, a], [, b]) => b.wins - a.wins);
+  for (const [name, stats] of sorted) {
+    const total = stats.wins + stats.losses;
+    const winRate = total ? ((stats.wins / total) * 100).toFixed(1) + '%' : '-';
+    const row = `<tr>
+      <td>${name}</td>
+      <td>${stats.wins}</td>
+      <td>${stats.losses}</td>
+      <td>${winRate}</td>
+      <td>${stats.elo}</td>
+      <td>${total}</td>
+    </tr>`;
+    tbody.innerHTML += row;
+  }
+}
+
+function renderMatchHistory(filterDate = '', filterPlayer = '') {
+  const tbody = document.getElementById('matchHistory');
+  tbody.innerHTML = '';
+  const matches = matchHistory.slice().reverse().filter(m => {
+    const byDate = !filterDate || m.date === filterDate;
+    const byPlayer = !filterPlayer || m.player1 === filterPlayer || m.player2 === filterPlayer;
+    return byDate && byPlayer;
+  });
+  for (const match of matches) {
+    const row = `<tr>
+      <td>${match.date}</td>
+      <td>${match.player1}</td>
+      <td>${match.score1} : ${match.score2}</td>
+      <td>${match.player2}</td>
+    </tr>`;
+    tbody.innerHTML += row;
+  }
+}
+
+function renderTopPlayer() {
+  let top = null;
+  for (const [name, stats] of Object.entries(players)) {
+    if (!top || stats.wins > top.stats.wins) {
+      top = { name, stats };
+    }
+  }
+  const el = document.getElementById('topPlayer');
+  el.textContent = top ? `${top.name} (${top.stats.wins} Wins)` : 'No players yet';
+}
+
+function populateDropdowns() {
+  const dropdowns = [document.getElementById('player1'), document.getElementById('player2'), document.getElementById('filterPlayer')];
+  for (const dropdown of dropdowns) {
+    dropdown.innerHTML = `<option value="">-- All Players --</option>`;
+    for (const name of Object.keys(players)) {
+      const option = document.createElement('option');
+      option.value = option.textContent = name;
+      dropdown.appendChild(option.cloneNode(true));
+    }
+  }
+}
+
+document.getElementById('addMatchBtn').addEventListener('click', addMatch);
+document.getElementById('filterDate').addEventListener('input', e => {
+  renderMatchHistory(e.target.value, document.getElementById('filterPlayer').value);
+});
+document.getElementById('filterPlayer').addEventListener('change', e => {
+  renderMatchHistory(document.getElementById('filterDate').value, e.target.value);
+});
+
+function exportData() {
+  const data = { players, matchHistory };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'pingpong_data.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showNotification('Data saved');
+}
+
+document.getElementById('importFile').addEventListener('change', function (e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = event => {
+    try {
+      const data = JSON.parse(event.target.result);
+      if (data.players && data.matchHistory) {
+        players = data.players;
+        matchHistory = data.matchHistory;
+        saveData();
+        populateDropdowns();
+        renderLeaderboard();
+        renderMatchHistory();
+        renderTopPlayer();
+        showNotification('Data loaded');
+      } else {
+        alert('Invalid data file');
+      }
+    } catch (err) {
+      alert('Failed to load data');
+    }
+  };
+  reader.readAsText(file);
+  this.value = '';
+});
+
+renderLeaderboard();
+renderMatchHistory();
+renderTopPlayer();
+populateDropdowns();
+
+  </script>
+</body>
+</html>
