@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TRAX Weblog Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>TRAX Weblog Tracker</h1>
+
+        <h2 id="instructions-header" class="collapsible">Data Management Instructions</h2>
+        <div id="instructions-content" class="collapsible-content">
+            <p><strong>Overview:</strong></p>
+            <p>Your data is stored locally in your browser, so it's important to back it up regularly by exporting it. This also allows you to share data with others.</p>
+            <p><strong>Exporting Data:</strong></p>
+            <ul>
+                <li><strong>Export to JSON:</strong> Click this button to save all your WEBLOG entries to a <strong>.json</strong> file. The file will be named according to the date and time of export, e.g., <code>weblogs_2025-09-09_12-47-41.json</code>. This is the most comprehensive format for backups.</li>
+                <li><strong>Export to CSV:</strong> Click this button to save all your data to a <strong>.csv</strong> file, which can be opened in Microsoft Excel, Google Sheets, or other spreadsheet editors. This format is convenient for analysis and creating reports.</li>
+            </ul>
+            <p><strong>Important Note on Saving:</strong></p>
+            <p>Browsers do not have direct access to network drives. When you export a file, it will be saved to your computer's "Downloads" folder. <strong>To share your data, you will need to manually move this file</strong> to the shared network folder:</p>
+            <p><code>\\Flsala\Engineering_&_Maintenance\Technical Resources\WebLogs Data Export</code></p>
+            <p><strong>Importing Data:</strong></p>
+            <ul>
+                <li><strong>Import from JSON:</strong> Click this button to select a <strong>.json</strong> file from your computer (or from a network drive). <strong>Warning:</strong> Imported data will replace all your current entries. It is recommended to back up your data before importing.</li>
+            </ul>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid var(--border-color); margin: 24px 0;">
+
+        <div id="search-container">
+            <input type="text" id="search-input" placeholder="Search by WEBLOG ID...">
+            <button id="search-button">Search</button>
+        </div>
+
+        <h2>Add New WEBLOG</h2>
+        <div id="add-weblog-form-container">
+            <form id="weblog-form">
+                <input type="text" id="weblog-id" placeholder="WEBLOG ID" required>
+                <input type="text" id="weblog-name" placeholder="Problem Title" required>
+                <input type="text" id="weblog-desc" placeholder="Short Description of the problem (max 200 chars)" maxlength="200" required>
+                <input type="text" id="weblog-link" placeholder="WEBLOG Link (URL)">
+                <select id="weblog-status">
+                    <option value="New">New</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Closed">Closed</option>
+                </select>
+                <input type="text" id="weblog-solution" placeholder="Solution (e.g., bug fixed in v1.2)">
+                <input type="text" id="weblog-file" placeholder="Solution Files (separate with commas)">
+                <textarea id="weblog-comments" placeholder="Add initial comments..." rows="3"></textarea>
+                <button type="submit">Add WEBLOG</button>
+            </form>
+        </div>
+
+        <div class="data-controls">
+            <button id="export-json">Export to JSON</button>
+            <button id="import-json">Import from JSON</button>
+            <input type="file" id="json-file-input" accept=".json" style="display:none;">
+            <button id="export-csv">Export to CSV</button>
+        </div>
+
+        <div id="save-location-info">
+            <p><strong>Note:</strong> Please save your exported files to this network path for shared access:</p>
+            <p><strong>\\Flsala\Engineering_&_Maintenance\Technical Resources\WebLogs Data Export</strong></p>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid var(--border-color); margin: 24px 0;">
+
+        <h2>WEBLOG List</h2>
+        <div id="current-weblogs-list">
+            <table id="current-weblog-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Status</th>
+                        <th class="action-buttons-cell">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid var(--border-color); margin: 24px 0;">
+
+        <h2>Completed WEBLOGS</h2>
+        <div id="completed-weblogs-list">
+            <table id="completed-weblog-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Status</th>
+                        <th class="action-buttons-cell">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="weblog-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 id="modal-title"></h2>
+            <div class="details-grid">
+                <div><span class="label">ID:</span> <span id="modal-id"></span></div>
+                <div><span class="label">Title:</span> <input type="text" id="modal-name"></div>
+                <div><span class="label">Description:</span> <textarea id="modal-desc"></textarea></div>
+                <div>
+                    <span class="label">Link:</span> <a id="modal-link" href="#" target="_blank">View WEBLOG</a>
+                </div>
+                <div>
+                    <span class="label">Status:</span>
+                    <select id="modal-status">
+                        <option value="New">New</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                </div>
+                <div><span class="label">Solution:</span> <textarea id="modal-solution"></textarea></div>
+                <div>
+                    <span class="label">Solution Files:</span>
+                    <ul id="modal-file-list" class="file-list"></ul>
+                    <input type="text" id="modal-file-input" placeholder="Add new file links...">
+                </div>
+                <div><span class="label">Meeting Date:</span> <input type="date" id="modal-meeting-date"></div>
+                <div><span class="label">Solution Date:</span> <input type="date" id="modal-solution-date"></div>
+                <div><span class="label">Days to Resolve:</span> <span id="days-to-resolve"></span></div>
+            </div>
+            <div id="modal-history-container" class="history">
+                <span class="label">History & Comments:</span>
+                <div id="modal-history"></div>
+                <div style="margin-top: 10px;">
+                    <textarea id="modal-new-comment" placeholder="Add a new comment" rows="2"></textarea>
+                    <button id="add-comment-btn">Add Comment</button>
+                </div>
+            </div>
+            <button id="save-changes-btn" style="margin-top: 20px;">Save Changes</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
