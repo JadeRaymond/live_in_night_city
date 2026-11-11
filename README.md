@@ -1,57 +1,28 @@
-![App Screenshot](https://i.ibb.co/PZFJvR5/logo.png)
+# Reelkeep 1.23 — source review export
 
-'Live in Night City' a.k.a. Survival Mode is a Cyberpunk 20077 Mod powered by Cyber Engine Tweaks.  
-It's brings more gameplay/immersion with character needs.
+Sanitized review snapshot, published at the user's request. Main application package: com.reelkeep.app.
 
+## Download
 
-## Features
+[Reelkeep-1.23-source-review.zip](Reelkeep-1.23-source-review.zip?raw=true)
 
-- Manage character's hunger, thirst and fatigue
-- Penalties according to character's needs level (however it can't kill you)
-- Dynamic status notification
-- Settings menu
-- Multi-language support (currently EN, FR, DE is supported, more to come)
+ZIP: 71,843 bytes. SHA-256: a080280f00f3d4931404d2ca3e228c228d1d070c53e7794c24ee149082e1881e
 
+Contains all 33 Java sources, original AndroidManifest.xml, complete res/, sanitized build.sh and BUILD.md. No keystore, password values, cookies, account sessions, binary dependencies or build output.
 
-## Installation
+## Text access for reviewers and AI assistants
 
-- Install [Cyber Engine Tweaks](https://github.com/yamashi/CyberEngineTweaks) (v1.18.1 or newer)
-- Install [Native Settings](https://github.com/justarandomguyintheinternet/CP77_nativeSettings) (v1.2 or newer)
-- Extract into the Cyber Engine Tweaks mod folder
-```bash
-"Cyberpunk 2077/bin/x64/plugins/cyber_engine_tweaks/mods"
-```
+These UTF-8 text files contain the exact same exported files, with FILE: path boundaries. No archive extraction is required.
 
+- [SOURCE-01.txt](SOURCE-01.txt) — read first
+- [SOURCE-02.txt](SOURCE-02.txt) — read second
+- [SOURCE-03.txt](SOURCE-03.txt) — read third
 
-## Usage
+Raw text URLs:
+- https://raw.githubusercontent.com/JadeRaymond/live_in_night_city/reelkeep-source-review-1.23/SOURCE-01.txt
+- https://raw.githubusercontent.com/JadeRaymond/live_in_night_city/reelkeep-source-review-1.23/SOURCE-02.txt
+- https://raw.githubusercontent.com/JadeRaymond/live_in_night_city/reelkeep-source-review-1.23/SOURCE-03.txt
 
-You can bind a hotkey in Cyber Engine Tweaks settings to display notifications as you wish.  
-You must drink and eat to regenerate V's thirst and hunger.  
-You must sleep at V's apartment to regenerate his fatigue. (You can also rest on the sofa)
+The build script uses external signing environment variables. Build prerequisites and excluded assets are documented in BUILD.md inside the ZIP and text export.
 
-
-## Roadmap
-
-- Finish the translation
-- Rework HUD
-- Add dirtiness management
-- More complex metabolism
-- Link player's actions (like sprinting, sex scene)
-- Link player's attributes and player's cyber-mods
-- Housing ? (craft only in V's apartment)
-
-
-## Screenshots
-
-![App Screenshot](https://i.ibb.co/gtzCkJN/example-hud.jpg)
-Notification
-
-![App Screenshot](https://i.ibb.co/g9Gj69M/example-settings.jpg)
-Settings
-
-
-##
-
-
-#### Credits
-[psiberx](https://github.com/psiberx) for his [CET kit](https://github.com/psiberx/cp2077-cet-kit), which I used to create this mod.
+This branch is only a review export; it is not the application's full runtime environment.

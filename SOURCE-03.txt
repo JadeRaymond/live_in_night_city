@@ -1,0 +1,103 @@
+
+========================================================================
+FILE: app/src/com/reelkeep/app/VideoSharing.java
+========================================================================
+package com.reelkeep.app;
+
+import android.content.*;
+import android.net.Uri;
+import org.json.JSONObject;
+import java.io.*;
+
+/** Shares a single existing local video using a temporary read grant, without copying it. */
+final class VideoSharing {
+    static final String MIME = "video/mp4";
+    static Uri uri(Context context, String id) {
+        return new Uri.Builder().scheme("content").authority(context.getPackageName()+".videoshare")
+                .appendPath(id).appendPath("video.mp4").build();
+    }
+    static String id(Context context, Uri uri) throws FileNotFoundException {
+        if (!"content".equals(uri.getScheme()) || !(context.getPackageName()+".videoshare").equals(uri.getAuthority())
+                || uri.getPathSegments().size()!=2 || !"video.mp4".equals(uri.getLastPathSegment())
+                || !uri.getPathSegments().get(0).matches("[a-f0-9-]{36}") || uri.getQuery()!=null || uri.getFragment()!=null)
+            throw new FileNotFoundException("Unknown video");
+        return uri.getPathSegments().get(0);
+    }
+    static JSONObject item(Context context, Uri uri) throws FileNotFoundException {
+        try { return Store.shared(context).find(id(context,uri)); }
+        catch(Exception error) { throw new FileNotFoundException("Video unavailable"); }
+    }
+    static File file(Context context, Uri uri) throws FileNotFoundException {
+        File file=MediaDepot.local(context,item(context,uri));
+        if(file==null)throw new FileNotFoundException("Download the video first");
+        return file;
+    }
+    static String filename(JSONObject item) {
+        String name=item.optString("title","").replaceAll("[^\\p{L}\\p{N} _-]","").trim();
+        if(name.length()>70)name=name.substring(0,70);
+        return (name.isEmpty()?"Reelkeep-video":name)+".mp4";
+    }
+    static Intent intent(Context context,String id) throws IOException {
+        Uri uri=uri(context,id);file(context,uri);
+        Intent intent=new Intent(Intent.ACTION_SEND).setType(MIME).putExtra(Intent.EXTRA_STREAM,uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.setClipData(ClipData.newRawUri("Reelkeep video",uri));return intent;
+    }
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/VisualText.java
+========================================================================
+package com.reelkeep.app;
+import android.content.Context;import android.graphics.*;import com.googlecode.tesseract.android.TessBaseAPI;import java.io.*;
+/** Optional local OCR enrichment, serialized to bound native memory. */
+final class VisualText{
+ static synchronized String read(Context c,String id){if(!id.matches("[a-f0-9-]{36}"))return "";Bitmap bitmap=null;TessBaseAPI api=null;try{api=new TessBaseAPI();File base=new File(c.getNoBackupFilesDir(),"ocr-v1"),data=new File(base,"tessdata");data.mkdirs();for(String lang:new String[]{"eng","rus"}){File target=new File(data,lang+".traineddata");if(!target.isFile()){File temp=new File(data,lang+".tmp");try(InputStream in=c.getAssets().open("ocr/"+lang+".traineddata");OutputStream out=new FileOutputStream(temp)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)out.write(b,0,n);}if(!temp.renameTo(target))throw new IOException("ocr_model_failed");}}File cover=new File(new File(c.getFilesDir(),"thumbs"),id+".jpg");if(!cover.isFile())return "";bitmap=BitmapFactory.decodeFile(cover.getPath());if(bitmap==null)return "";if(!api.init(base.getPath(),"eng+rus",TessBaseAPI.OEM_LSTM_ONLY))return "";api.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT);api.setImage(bitmap);String text=Smart.clean(api.getUTF8Text());if(api.meanConfidence()<35||text.replaceAll("[^\\p{L}\\p{N}]","").length()<8)return "";return text.length()>2000?text.substring(0,2000):text;}catch(Throwable e){android.util.Log.w("Reelkeep","OCR unavailable",e);return "";}finally{if(api!=null)api.recycle();if(bitmap!=null)bitmap.recycle();}}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/WebMedia.java
+========================================================================
+package com.reelkeep.app;
+import org.json.*;import java.io.*;import java.net.*;import java.util.*;
+/** Public Instagram metadata and embedded-player JSON; no browser impersonation. */
+public final class WebMedia {
+ static byte[] get(String value,boolean image,String cookie)throws Exception{URL url=new URL(value);for(int redirects=0;redirects<5;redirects++){if(!allowed(url,image))throw new IOException("unsupported_host");HttpURLConnection connection=(HttpURLConnection)url.openConnection();connection.setConnectTimeout(12000);connection.setReadTimeout(15000);connection.setInstanceFollowRedirects(false);connection.setRequestProperty("User-Agent","Reelkeep/1.2");if(!image){connection.setRequestProperty("Accept","text/html,application/json");if(cookie!=null&&!cookie.isEmpty())connection.setRequestProperty("Cookie",cookie);if(url.getPath().startsWith("/api/")){connection.setRequestProperty("X-IG-App-ID","936619743392459");connection.setRequestProperty("X-ASBD-ID","359341");connection.setRequestProperty("X-IG-WWW-Claim","0");connection.setRequestProperty("X-Requested-With","XMLHttpRequest");connection.setRequestProperty("Referer","https://www.instagram.com/");}}try{int status=connection.getResponseCode();if(status>=300&&status<400){String location=connection.getHeaderField("Location");if(location==null)throw new IOException("redirect_missing");url=new URL(url,location);continue;}if(status!=200)throw new IOException("http_"+status);int limit=image?4000000:2500000;ByteArrayOutputStream out=new ByteArrayOutputStream();try(InputStream in=connection.getInputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){if(out.size()+n>limit)throw new IOException("response_too_large");out.write(b,0,n);}}return out.toByteArray();}finally{connection.disconnect();}}throw new IOException("too_many_redirects");}
+ static boolean allowed(URL u,boolean image){String h=u.getHost().toLowerCase(Locale.ROOT);return u.getProtocol().equals("https")&&u.getUserInfo()==null&&(image?(h.endsWith(".cdninstagram.com")||h.endsWith(".fbcdn.net")||h.equals("instagram.com")||h.endsWith(".instagram.com")):(h.equals("instagram.com")||h.endsWith(".instagram.com")));}
+ static String string(String html,String key){int offset=0;while(offset<html.length()){int found=html.indexOf(key,offset);if(found<0)return "";offset=found+key.length();if(found==0||html.charAt(found-1)!='"')continue;int at=offset;while(at<html.length()&&(html.charAt(at)=='\\'||html.charAt(at)=='"'||Character.isWhitespace(html.charAt(at))))at++;if(at>=html.length()||html.charAt(at++)!=':')continue;while(at<html.length()&&Character.isWhitespace(html.charAt(at)))at++;int opening=0;while(at<html.length()&&html.charAt(at)=='\\'){opening++;at++;}if(at>=html.length()||html.charAt(at++)!='"')continue;int start=at;for(;at<html.length();at++){if(html.charAt(at)!='"')continue;int slashes=0,j=at-1;while(j>=start&&html.charAt(j--)=='\\')slashes++;if(slashes!=opening)continue;String raw=html.substring(start,at-opening);for(int layer=0;layer<5;layer++){try{String decoded=new JSONArray("[\""+raw+"\"]").getString(0);if(decoded.equals(raw))break;raw=decoded;}catch(Exception e){break;}}return Smart.decode(raw);}}return "";}
+ static String versions(String html,String key){int index=html.indexOf(key);if(index<0)return "";return string(html.substring(index,Math.min(html.length(),index+15000)),"url");}
+ static JSONObject parse(String html)throws Exception{Map<String,String> meta=Smart.meta(html);String description=Smart.caption(meta),image=meta.get("og:image"),video=meta.get("og:video:secure_url");if(video==null||video.isEmpty())video=meta.get("og:video");if(video==null||video.isEmpty())video=string(html,"video_url");if(video.isEmpty())video=versions(html,"video_versions");if(image==null||image.isEmpty())image=string(html,"display_url");if(image.isEmpty())image=versions(html,"image_versions2");if(description.isEmpty()){int caption=html.indexOf("edge_media_to_caption");if(caption>=0)description=Smart.clean(string(html.substring(caption,Math.min(html.length(),caption+24000)),"text"));}if(description.isEmpty())description=Smart.clean(string(html,"captionText"));return new JSONObject().put("description",description).put("imageUrl",image==null?"":image).put("videoUrl",video==null?"":video);}
+ interface Progress{void changed(long bytes,long total)throws Exception;}
+ static long downloadTo(String value,File file)throws Exception{return downloadTo(value,file,null);}
+ static long downloadTo(String value,File file,Progress progress)throws Exception{URL url=new URL(value);for(int redirects=0;redirects<5;redirects++){if(!allowed(url,true))throw new IOException("unsupported_host");HttpURLConnection conn=(HttpURLConnection)url.openConnection();conn.setConnectTimeout(15000);conn.setReadTimeout(20000);conn.setInstanceFollowRedirects(false);conn.setRequestProperty("User-Agent","Reelkeep/1.2");try{int status=conn.getResponseCode();if(status>=300&&status<400){String location=conn.getHeaderField("Location");if(location==null)throw new IOException("redirect_missing");url=new URL(url,location);continue;}if(status!=200)throw new IOException("http_"+status);long size=0,last=0,total=conn.getContentLengthLong();try(InputStream in=conn.getInputStream();OutputStream out=new FileOutputStream(file)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1){size+=n;if(size>300L*1024*1024)throw new IOException("video_too_large");out.write(b,0,n);if(progress!=null&&System.currentTimeMillis()-last>800){progress.changed(size,total);last=System.currentTimeMillis();}}}if(progress!=null)progress.changed(size,total);try(InputStream header=new FileInputStream(file)){byte[] bytes=new byte[12];if(header.read(bytes)!=12||bytes[4]!='f'||bytes[5]!='t'||bytes[6]!='y'||bytes[7]!='p')throw new IOException("not_mp4");}return size;}finally{conn.disconnect();}}throw new IOException("too_many_redirects");}
+ static JSONObject combine(JSONObject page,JSONObject embed)throws Exception{JSONObject result=new JSONObject(page.toString());for(String key:new String[]{"description","imageUrl","videoUrl"})if(result.optString(key).isEmpty()&&!embed.optString(key).isEmpty())result.put(key,embed.getString(key));return result;}
+}
+
+
+========================================================================
+FILE: build.sh
+========================================================================
+#!/usr/bin/env bash
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
+BT="$PWD/tools/android-15"
+ANDROID="$PWD/tools/android-35/android.jar"
+chmod +x "$BT/aapt2" "$BT/zipalign" "$BT/apksigner"
+mkdir -p build/classes build/dex
+"$BT/aapt2" compile --dir app/res -o build/resources.zip
+"$BT/aapt2" link -o build/base.apk --manifest app/AndroidManifest.xml -I "$ANDROID" --java build/generated build/resources.zip -A app/assets
+java -jar tools/ecj.jar -8 -proc:none -cp "$ANDROID:tools/ort.jar:tools/tess.jar" -d build/classes app/src/com/reelkeep/app/*.java build/generated/com/reelkeep/app/R.java
+java -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 --min-api 26 --lib "$ANDROID" --output build/dex tools/ort.jar tools/tess.jar $(find build/classes -name '*.class')
+cp build/base.apk build/unsigned.apk
+(cd build/dex && zip -q ../unsigned.apk classes*.dex)
+(cd build/native && zip -qr ../unsigned.apk lib)
+"$BT/zipalign" -f 4 build/unsigned.apk build/aligned.apk
+# Signing material is deliberately external to this review archive.
+: "${REELKEEP_KEYSTORE:?Set the path to an external keystore}"
+: "${REELKEEP_KS_PASS:?Set the keystore password in the environment}"
+"$BT/apksigner" sign --ks "$REELKEEP_KEYSTORE" --ks-pass env:REELKEEP_KS_PASS --out build/reelkeep.apk build/aligned.apk
+"$BT/apksigner" verify build/reelkeep.apk
+"$BT/aapt2" dump badging build/reelkeep.apk | sed -n '1,12p'
+

@@ -1,0 +1,565 @@
+Reelkeep 1.23 — sanitized source review. These are literal exported source files.
+
+
+========================================================================
+FILE: BUILD.md
+========================================================================
+# Reelkeep — сборка и состав архива для внешнего разбора
+
+Снимок исходников: версия 1.23, versionCode 34, пакет `com.reelkeep.app`.
+Исходный проект расположен в `/workspace/reelkeep`.
+После распаковки корень проекта — папка, содержащая этот файл, `build.sh` и `app/`.
+
+## Состав
+
+- Все 33 Java-файла из `app/src/com/reelkeep/app/`, без изменения содержимого.
+- Исходный `app/AndroidManifest.xml` из проекта, не декомпилированный из APK.
+- Вся существующая папка `app/res/`: drawable и values/styles.
+- `build.sh` — копия скрипта проекта с удалёнными реквизитами подписи.
+- Этот `BUILD.md`.
+
+Gradle в этой конфигурации не используется: файлов `build.gradle`, `settings.gradle`
+и `gradle.properties` в корне проекта нет.
+
+## Окружение
+
+- Android SDK Platform API 35; заголовки: `tools/android-35/android.jar`.
+- Android SDK Build Tools 35.0.0; в текущем проекте установлен в исторически
+  названную папку `tools/android-15/`. Номер папки НЕ означает версию build-tools.
+- `compileSdk`: 35; `minSdk`: 26; `targetSdk`: 32 (см. исходный манифест).
+- Проверенное окружение: OpenJDK 21.0.13.
+- Java-компилятор Eclipse ECJ (`tools/ecj.jar`), параметр `-8`: Java 8.
+- Утилиты: Bash, Java, zip, aapt2, D8, zipalign, apksigner.
+
+## Команда сборки
+
+В полном исходном рабочем проекте:
+
+```sh
+cd /workspace/reelkeep
+bash build.sh
+```
+
+В распакованной копии при восстановленных зависимостях:
+
+```sh
+cd /path/to/Reelkeep-source-review-1.23
+bash build.sh
+```
+
+Копия скрипта определяет корень по собственному расположению.
+Последовательность: aapt2 compile/link → ECJ → D8 → упаковка dex и native libs →
+zipalign → подпись и проверка apksigner.
+Выход основного скрипта: `build/reelkeep.apk` (состав ABI зависит от подготовленных native libs).
+В опубликованной телефонной сборке 1.23 оставлен только `arm64-v8a`:
+из APK исключаются другие ABI и старая подпись, затем выполняются zipalign
+и повторная подпись. Готовый релиз в рабочем окружении:
+`/workspace/library-files/Reelkeep-1.23.apk`.
+APK в этот архив не включён.
+
+## Внешние зависимости и ограничения
+
+Это строго запрошенный архив для анализа, а не самодостаточная сборочная среда.
+Он НЕ собирается изолированно без восстановления зависимостей и ресурсов:
+
+- Android SDK, build-tools и ECJ.
+- `tools/ort.jar` (ONNX Runtime) и `tools/tess.jar` (Tesseract Java API).
+- Подготовленные нативные библиотеки в `build/native/lib/`.
+- `app/assets/`: WebView-интерфейс и ресурсы приложения. Эта папка не входит
+  в запрошенный перечень экспорта и целиком оставлена за пределами архива.
+  Для полноценного воспроизведения интерфейса отдельно нужны её HTML/CSS/JS,
+  локализации, а для всех возможностей — модели, OCR-данные, шрифты и runtime.
+
+В архиве нет `tools/`, `app/assets/`, `build/`, `.gradle/`, `outputs/`, SDK/JAR/AAR,
+SO, ONNX, traineddata, TTF, WHL и исполняемых файлов yt-dlp.
+Скрипт не загружает и не подменяет эти отсутствующие зависимости автоматически.
+
+## Подпись
+
+Релиз подписывается локально Android `apksigner` с существующим keystore
+после `zipalign`. Сам keystore, ключи и пароли отсутствуют в архиве.
+
+Экспортная копия `build.sh` берёт путь к ВНЕШНЕМУ keystore из
+`REELKEEP_KEYSTORE`, а пароль — из переменной окружения `REELKEEP_KS_PASS`
+через механизм `apksigner --ks-pass env:...`. Значения необходимо передать
+самостоятельно через безопасное окружение. Никаких готовых значений в архиве нет.
+Автоматическое создание ключа из исходного рабочего скрипта удалено.
+При отдельном пароле ключа потребуется соответствующий параметр apksigner.
+Для установки обновления поверх существующего приложения нужна та же подпись;
+другой ключ даёт другую подпись.
+
+## Отличия экспортной копии скрипта
+
+1. Абсолютный `cd` заменён определением каталога самого скрипта.
+2. Удалена команда создания keystore с встроенными реквизитами.
+3. Путь и пароль подписи заменены внешними переменными окружения.
+Остальная последовательность сборки сохранена; рабочий проект и его ключ не изменялись.
+
+## Данные и учётные записи
+
+Пользовательский каталог, cookies, сессии Instagram, токены и прочие учётные
+данные не экспортировались. Упоминания CookieManager и названий полей сессии
+в Java — исходный код обработки данных, а не сохранённая сессия.
+
+
+========================================================================
+FILE: app/AndroidManifest.xml
+========================================================================
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.reelkeep.app" android:versionCode="34" android:versionName="1.23"><uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/><uses-permission android:name="android.permission.WAKE_LOCK"/><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="32"/><application android:extractNativeLibs="true" android:label="Reelkeep" android:theme="@style/AppTheme" android:icon="@drawable/icon" android:allowBackup="false" android:usesCleartextTraffic="false"><provider android:name=".ApkShareProvider" android:authorities="com.reelkeep.app.apkshare" android:exported="false" android:grantUriPermissions="true"/><provider android:name=".VideoShareProvider" android:authorities="com.reelkeep.app.videoshare" android:exported="false" android:grantUriPermissions="true"/><service android:name=".TransferService" android:exported="false" android:foregroundServiceType="dataSync"/><activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask" android:configChanges="orientation|screenSize|keyboardHidden" android:windowSoftInputMode="adjustResize"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter><intent-filter><action android:name="android.intent.action.SEND"/><category android:name="android.intent.category.DEFAULT"/><data android:mimeType="text/plain"/></intent-filter><intent-filter><action android:name="android.intent.action.SEND"/><category android:name="android.intent.category.DEFAULT"/><data android:mimeType="video/*"/></intent-filter></activity><activity android:name=".InstagramActivity" android:exported="false"/><activity android:name=".PlayerActivity" android:exported="false"/></application></manifest>
+
+
+========================================================================
+FILE: app/res/drawable/icon.xml
+========================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108"><path android:fillColor="#325a46" android:pathData="M0,0h108v108h-108z"/><path android:fillColor="#e9eedf" android:pathData="M32,31h44v52l-22,-13 -22,13z"/><path android:fillColor="#325a46" android:pathData="M47,40l20,12 -20,12z"/></vector>
+
+
+========================================================================
+FILE: app/res/drawable/player_back.xml
+========================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+<path android:fillColor="@android:color/transparent" android:strokeColor="#FFF0F2EF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M15,5 L8,12 L15,19"/>
+</vector>
+
+
+========================================================================
+FILE: app/res/drawable/player_forward.xml
+========================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+<group android:pivotX="12" android:scaleX="-1"><path android:fillColor="@android:color/transparent" android:strokeColor="#FFF0F2EF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M3.5,10 A8.5,8.5 0,1 1,3.5 17 M3.5,4.5 L3.5,10 L9,10"/>
+</group><path android:fillColor="@android:color/transparent" android:strokeColor="#FFF0F2EF" android:strokeWidth="1.2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M8,12 L10,11 L10,17 M8.5,17 L11.5,17 M15.5,11 C12.5,11 12.5,17 15.5,17 C18.5,17 18.5,11 15.5,11 Z"/>
+</vector>
+
+
+========================================================================
+FILE: app/res/drawable/player_muted.xml
+========================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+<path android:fillColor="@android:color/transparent" android:strokeColor="#FFF0F2EF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M3,10 L7,10 L12,6 L12,18 L7,14 L3,14 Z M16,9 L21,15 M21,9 L16,15"/>
+</vector>
+
+
+========================================================================
+FILE: app/res/drawable/player_pause.xml
+========================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+<path android:fillColor="#FFF0F2EF" android:pathData="M7,5 L10,5 L10,19 L7,19 Z M14,5 L17,5 L17,19 L14,19 Z"/>
+</vector>
+
+
+========================================================================
+FILE: app/res/drawable/player_play.xml
+========================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+<path android:fillColor="#FFF0F2EF" android:pathData="M8,5 L19,12 L8,19 Z"/>
+</vector>
+
+
+========================================================================
+FILE: app/res/drawable/player_rewind.xml
+========================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+<path android:fillColor="@android:color/transparent" android:strokeColor="#FFF0F2EF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M3.5,10 A8.5,8.5 0,1 1,3.5 17 M3.5,4.5 L3.5,10 L9,10"/>
+<path android:fillColor="@android:color/transparent" android:strokeColor="#FFF0F2EF" android:strokeWidth="1.2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M8,12 L10,11 L10,17 M8.5,17 L11.5,17 M15.5,11 C12.5,11 12.5,17 15.5,17 C18.5,17 18.5,11 15.5,11 Z"/>
+</vector>
+
+
+========================================================================
+FILE: app/res/drawable/player_sound.xml
+========================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+<path android:fillColor="@android:color/transparent" android:strokeColor="#FFF0F2EF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M3,10 L7,10 L12,6 L12,18 L7,14 L3,14 Z M16,8 C19,10 19,14 16,16 M19,5 C24,9 24,15 19,19"/>
+</vector>
+
+
+========================================================================
+FILE: app/res/values/styles.xml
+========================================================================
+<resources><style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:colorAccent">#48544e</item><item name="android:windowLightStatusBar">true</item><item name="android:windowLightNavigationBar">true</item><item name="android:windowActionModeOverlay">false</item><item name="android:windowBackground">#f8f9f7</item></style></resources>
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/ApkShareProvider.java
+========================================================================
+package com.reelkeep.app;
+
+import android.content.*;
+import android.database.Cursor;
+import android.database.MatrixCursor;
+import android.net.Uri;
+import android.os.ParcelFileDescriptor;
+import android.provider.OpenableColumns;
+import java.io.*;
+
+/** Private provider with temporary read grants for exactly one installed APK. */
+public final class ApkShareProvider extends ContentProvider {
+    public boolean onCreate() { return true; }
+    private File apk(Uri uri) throws FileNotFoundException {
+        if (!ApkSharing.uri(getContext()).equals(uri)) throw new FileNotFoundException("Unknown file");
+        try { return ApkSharing.installed(getContext()); }
+        catch (IOException error) { throw new FileNotFoundException(error.getMessage()); }
+    }
+    @Override public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
+        if (!"r".equals(mode)) throw new FileNotFoundException("Read only");
+        return ParcelFileDescriptor.open(apk(uri), ParcelFileDescriptor.MODE_READ_ONLY);
+    }
+    public String getType(Uri uri) {
+        if (!ApkSharing.uri(getContext()).equals(uri)) throw new IllegalArgumentException("Unknown file");
+        return ApkSharing.MIME;
+    }
+    public Cursor query(Uri uri, String[] projection, String selection, String[] args, String order) {
+        File file;
+        try { file = apk(uri); } catch (IOException error) { return null; }
+        String[] columns = projection == null ? new String[]{OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE} : projection;
+        MatrixCursor result = new MatrixCursor(columns, 1);
+        Object[] row = new Object[columns.length];
+        for (int i = 0; i < columns.length; i++) {
+            if (OpenableColumns.DISPLAY_NAME.equals(columns[i])) row[i] = ApkSharing.filename(getContext());
+            else if (OpenableColumns.SIZE.equals(columns[i])) row[i] = file.length();
+        }
+        result.addRow(row); return result;
+    }
+    public Uri insert(Uri uri, ContentValues values) { throw new UnsupportedOperationException("Read only"); }
+    public int delete(Uri uri, String selection, String[] args) { throw new UnsupportedOperationException("Read only"); }
+    public int update(Uri uri, ContentValues values, String selection, String[] args) { throw new UnsupportedOperationException("Read only"); }
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/ApkSharing.java
+========================================================================
+package com.reelkeep.app;
+
+import android.content.ClipData;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.net.Uri;
+import java.io.File;
+import java.io.IOException;
+
+/** Shares only the installed, signed, monolithic APK; never a catalog/archive. */
+final class ApkSharing {
+    static final String MIME = "application/vnd.android.package-archive";
+    static String filename(Context c) {
+        String version = "";
+        try { version = c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName; }
+        catch (Exception ignored) {}
+        return "Reelkeep" + (version == null || version.isEmpty() ? "" : "-" + version.replaceAll("[^0-9A-Za-z._-]", "")) + ".apk";
+    }
+    static File installed(Context c) throws IOException {
+        ApplicationInfo app = c.getApplicationInfo();
+        if (app.splitSourceDirs != null && app.splitSourceDirs.length != 0)
+            throw new IOException("Установка состоит из нескольких APK. Поделиться этой сборкой нельзя.");
+        File file = new File(app.sourceDir == null ? "" : app.sourceDir);
+        if (!file.isFile() || file.length() == 0) throw new IOException("Установочный APK не найден");
+        return file;
+    }
+    static Uri uri(Context c) {
+        return new Uri.Builder().scheme("content").authority(c.getPackageName() + ".apkshare")
+                .appendPath(filename(c)).build();
+    }
+    static Intent intent(Context c) throws IOException {
+        installed(c);
+        Uri uri = uri(c);
+        Intent intent = new Intent(Intent.ACTION_SEND).setType(MIME)
+                .putExtra(Intent.EXTRA_STREAM, uri)
+                .putExtra(Intent.EXTRA_SUBJECT, filename(c))
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.setClipData(ClipData.newRawUri(filename(c), uri));
+        return intent;
+    }
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/Archive.java
+========================================================================
+package com.reelkeep.app;
+import java.io.*;import java.util.*;import java.util.zip.*;import org.json.*;
+public final class Archive{
+ static void entry(ZipOutputStream zip,String name,File file)throws Exception{zip.putNextEntry(new ZipEntry(name));try(InputStream in=new FileInputStream(file)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)zip.write(b,0,n);}zip.closeEntry();}
+ static String sha(File file)throws Exception{java.security.MessageDigest md=java.security.MessageDigest.getInstance("SHA-256");try(InputStream in=new FileInputStream(file)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)md.update(b,0,n);}StringBuilder hex=new StringBuilder();for(byte b:md.digest())hex.append(String.format(java.util.Locale.ROOT,"%02x",b&255));return hex.toString();}
+ static int write(Store store,OutputStream output)throws Exception{JSONObject snapshot=new JSONObject(store.read()).put("archiveVersion",2);JSONObject hashes=new JSONObject();JSONArray privateItems=snapshot.getJSONArray("items");for(int i=0;i<privateItems.length();i++){privateItems.getJSONObject(i).remove("videoUrl");privateItems.getJSONObject(i).remove("videoPreparedAt");}File root=store.c.getFilesDir();int count=0;Set<String> written=new HashSet<>();try(ZipOutputStream zip=new ZipOutputStream(output)){zip.setLevel(0);zip.putNextEntry(new ZipEntry("catalog.json"));byte[] metadata=snapshot.toString().getBytes("UTF-8");zip.write(metadata);java.security.MessageDigest md=java.security.MessageDigest.getInstance("SHA-256");StringBuilder hash=new StringBuilder();for(byte b:md.digest(metadata))hash.append(String.format(java.util.Locale.ROOT,"%02x",b&255));hashes.put("catalog.json",hash.toString());zip.closeEntry();JSONArray items=snapshot.getJSONArray("items");for(int i=0;i<items.length();i++){JSONObject item=items.getJSONObject(i);String file=item.optString("file"),id=item.optString("id");if(file.matches("[a-f0-9-]{36}\\.mp4")&&new File(root,file).isFile()&&written.add(file)){entry(zip,"videos/"+file,new File(root,file));hashes.put("videos/"+file,sha(new File(root,file)));count++;}if(id.matches("[a-f0-9-]{36}")&&new File(new File(root,"thumbs"),id+".jpg").isFile()){File thumb=new File(new File(root,"thumbs"),id+".jpg");entry(zip,"thumbs/"+id+".jpg",thumb);hashes.put("thumbs/"+id+".jpg",sha(thumb));}}zip.putNextEntry(new ZipEntry("checksums.json"));zip.write(hashes.toString().getBytes("UTF-8"));zip.closeEntry();}return count;}
+ static void clean(File file){if(file.isDirectory()){File[] files=file.listFiles();if(files!=null)for(File f:files)clean(f);}file.delete();}
+ static int restore(Store store,InputStream input)throws Exception{File stage=new File(store.c.getFilesDir(),"restore-"+UUID.randomUUID());stage.mkdirs();long total=0;int entries=0;Set<String> seen=new HashSet<>();try{try(ZipInputStream zip=new ZipInputStream(input)){ZipEntry e;while((e=zip.getNextEntry())!=null){String name=e.getName();if(e.isDirectory()&&(name.equals("videos/")||name.equals("thumbs/")))continue;if(++entries>25000||!seen.add(name)||!(name.equals("catalog.json")||name.equals("checksums.json")||name.matches("videos/[a-f0-9-]{36}\\.mp4")||name.matches("thumbs/[a-f0-9-]{36}\\.jpg")))throw new IOException("Неверная структура резервной копии");File file=new File(stage,name);file.getParentFile().mkdirs();long bytes=0,limit=name.equals("catalog.json")||name.equals("checksums.json")?10000000:name.endsWith(".jpg")?20000000:300L*1024*1024;try(OutputStream out=new FileOutputStream(file)){byte[] b=new byte[65536];int n;while((n=zip.read(b))!=-1){bytes+=n;total+=n;if(bytes>limit||total>2L*1024*1024*1024)throw new IOException("Резервная копия слишком большая");out.write(b,0,n);}}zip.closeEntry();}}File catalog=new File(stage,"catalog.json");if(!catalog.isFile())throw new IOException("В архиве нет каталога");ByteArrayOutputStream out=new ByteArrayOutputStream();try(InputStream in=new FileInputStream(catalog)){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);}JSONObject restored=new JSONObject(new String(out.toByteArray(),"UTF-8"));if(restored.optInt("archiveVersion")>=2){File checksum=new File(stage,"checksums.json");if(!checksum.isFile())throw new IOException("backup_checksum_missing");byte[] raw=new byte[(int)checksum.length()];try(DataInputStream in=new DataInputStream(new FileInputStream(checksum))){in.readFully(raw);}JSONObject hashes=new JSONObject(new String(raw,"UTF-8"));java.util.Iterator<String> expected=hashes.keys();while(expected.hasNext())if(!seen.contains(expected.next()))throw new IOException("backup_checksum_missing_file");for(String name:seen){if(name.equals("checksums.json"))continue;String hash=hashes.optString(name);if(!hash.matches("[a-f0-9]{64}")||!hash.equals(sha(new File(stage,name))))throw new IOException("backup_checksum_mismatch");}}return store.restore(restored,stage);}finally{clean(stage);}}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/ControlSurface.java
+========================================================================
+package com.reelkeep.app;
+import android.graphics.*;import android.graphics.drawable.Drawable;
+/** Quiet Remote-inspired native material: shaded body, directional rim and soft glint. */
+final class ControlSurface extends Drawable{
+ final Paint body=new Paint(3),rim=new Paint(3),light=new Paint(3);final RectF shape=new RectF();final int top,bottom,edgeHigh,edgeLow,glint;final float radius,width;final SurfaceLighting lighting;float previousX=Float.NaN,previousY=Float.NaN;
+ ControlSurface(SurfaceLighting lighting,int top,int bottom,int edgeHigh,int edgeLow,int glint,float radius,float width){this.lighting=lighting;this.top=top;this.bottom=bottom;this.edgeHigh=edgeHigh;this.edgeLow=edgeLow;this.glint=glint;this.radius=radius;this.width=width;rim.setStyle(Paint.Style.STROKE);rim.setStrokeWidth(width);lighting.add(this);}
+ protected void onBoundsChange(Rect bounds){shape.set(bounds.left+width/2,bounds.top+width/2,bounds.right-width/2,bounds.bottom-width/2);body.setShader(new LinearGradient(0,shape.top,0,shape.bottom,top,bottom,Shader.TileMode.CLAMP));previousX=Float.NaN;}
+ void illuminate(){if(shape.isEmpty())return;float x=lighting.x,y=lighting.y;if(x==previousX&&y==previousY)return;previousX=x;previousY=y;float dx=x*shape.width()/2,dy=y*shape.height()/2;rim.setShader(new LinearGradient(shape.centerX()+dx,shape.centerY()+dy,shape.centerX()-dx,shape.centerY()-dy,edgeHigh,edgeLow,Shader.TileMode.CLAMP));light.setShader(new RadialGradient(shape.centerX()+dx*.55f,shape.centerY()+dy*.55f,Math.max(shape.width(),shape.height())*.46f,(glint<<24)|0xffffff,0x00ffffff,Shader.TileMode.CLAMP));}
+ public void draw(Canvas canvas){if(shape.isEmpty())return;illuminate();float corner=Math.min(radius,shape.height()/2);canvas.drawRoundRect(shape,corner,corner,body);canvas.drawRoundRect(shape,corner,corner,light);canvas.drawRoundRect(shape,corner,corner,rim);}
+ public void getOutline(Outline outline){outline.setRoundRect(getBounds(),Math.min(radius,getBounds().height()/2f));outline.setAlpha(1);}
+ public int getOpacity(){return PixelFormat.TRANSLUCENT;}public void setAlpha(int alpha){body.setAlpha(alpha);rim.setAlpha(alpha);light.setAlpha(alpha);invalidateSelf();}public void setColorFilter(ColorFilter filter){body.setColorFilter(filter);invalidateSelf();}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/CoverPolicy.java
+========================================================================
+package com.reelkeep.app;
+import org.json.*;
+public final class CoverPolicy {
+ static String source(JSONObject item){if(item.optBoolean("thumbManual"))return "manual";String source=item.optString("thumbSource");return source.equals("instagram")||source.equals("frame")||source.equals("manual")?source:"unknown";}
+ static boolean mayWrite(JSONObject item,boolean exists,String incoming){if(!incoming.equals("manual")&&!incoming.equals("instagram")&&!incoming.equals("frame"))return false;if(incoming.equals("manual"))return true;if(!exists)return true;if(source(item).equals("manual"))return false;return incoming.equals("instagram");}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/DismissSwipe.java
+========================================================================
+package com.reelkeep.app;
+/** Distance is in dp, velocity in dp/sec. Only deliberate downward gestures dismiss. */
+final class DismissSwipe{
+ static boolean vertical(float dx,float dy){return dy>12&&dy>Math.abs(dx)*1.4f;}
+ static boolean finish(float dx,float dy,float velocity,float height){return vertical(dx,dy)&&(dy>=Math.max(72,height*.14f)||dy>=48&&velocity>=850);}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/DownloadQueue.java
+========================================================================
+package com.reelkeep.app;
+import java.util.*;import java.util.concurrent.*;
+/** One shared job per reel; a separate lane keeps taps out of the background queue. */
+public final class DownloadQueue {
+ public interface Work{String run(Job job)throws Exception;}
+ public static final class Job implements Runnable{public final String id;public final CompletableFuture<String> future=new CompletableFuture<>();public volatile long bytes,total;public volatile String stage="queued";volatile boolean started,cancelled;volatile Thread runner;final Work work;final DownloadQueue owner;Job(String id,Work work,DownloadQueue owner){this.id=id;this.work=work;this.owner=owner;}public void run(){started=true;runner=Thread.currentThread();try{if(cancelled)throw new CancellationException("download_cancelled");future.complete(work.run(this));}catch(Throwable e){future.completeExceptionally(e);}finally{runner=null;Thread.interrupted();owner.remove(this);}}}
+ final ThreadPoolExecutor background=(ThreadPoolExecutor)Executors.newFixedThreadPool(1),interactive=(ThreadPoolExecutor)Executors.newFixedThreadPool(1);final Map<String,Job> jobs=new HashMap<>();
+ public synchronized Job submit(String id,boolean urgent,Work work){Job old=jobs.get(id);if(old!=null&&!old.future.isDone()){if(urgent&&!old.started&&background.getQueue().remove(old))interactive.execute(old);return old;}Job job=new Job(id,work,this);jobs.put(id,job);(urgent?interactive:background).execute(job);return job;}
+ synchronized void remove(Job job){if(jobs.get(job.id)==job)jobs.remove(job.id);}
+ public synchronized Job find(String id){return jobs.get(id);}public synchronized List<Job> snapshot(){return new ArrayList<>(jobs.values());}
+ public synchronized void cancel(String id){Job job=jobs.get(id);if(job==null)return;job.cancelled=true;job.stage="cancelling";if(!job.started&&(background.getQueue().remove(job)||interactive.getQueue().remove(job))){job.future.completeExceptionally(new CancellationException("download_cancelled"));remove(job);}else if(job.runner!=null)job.runner.interrupt();}
+ public void shutdown(){background.shutdownNow();interactive.shutdownNow();}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/Enrichment.java
+========================================================================
+package com.reelkeep.app;
+import android.content.Context;import android.webkit.CookieManager;import java.math.BigInteger;import android.graphics.*;import android.media.MediaMetadataRetriever;import org.json.*;import java.io.*;import java.net.*;import java.util.*;import java.util.regex.*;
+public final class Enrichment{
+ static boolean allowed(URL url,boolean image){return WebMedia.allowed(url,image);}
+ static byte[] get(String value,boolean image)throws Exception{return WebMedia.get(value,image,image?"":CookieManager.getInstance().getCookie("https://www.instagram.com/"));}
+ static boolean writeBitmap(Context c,String id,Bitmap bitmap)throws Exception{return writeBitmap(c,id,bitmap,"frame");}
+ static boolean writeBitmap(Context c,String id,Bitmap bitmap,String source)throws Exception{synchronized(Store.shared(c)){JSONObject item=Store.shared(c).find(id);File existing=new File(new File(c.getFilesDir(),"thumbs"),id+".jpg");if(!CoverPolicy.mayWrite(item,existing.isFile()&&existing.length()>0,source)){if(bitmap!=null)bitmap.recycle();return false;}if(bitmap==null)return false;int width=bitmap.getWidth(),height=bitmap.getHeight();float scale=Math.min(1f,640f/Math.max(width,height));Bitmap scaled=Bitmap.createScaledBitmap(bitmap,Math.max(1,Math.round(width*scale)),Math.max(1,Math.round(height*scale)),true);File folder=new File(c.getFilesDir(),"thumbs");folder.mkdirs();File target=new File(folder,id+".jpg"),temp=new File(folder,id+".tmp");try(OutputStream out=new FileOutputStream(temp)){if(!scaled.compress(Bitmap.CompressFormat.JPEG,85,out))throw new IOException("Не удалось создать обложку");}if(!temp.renameTo(target))throw new IOException("Не удалось сохранить обложку");if(scaled!=bitmap)scaled.recycle();bitmap.recycle();Store.shared(c).patch(id,new JSONObject().put("thumb",true).put("thumbSource",source));return true;}}
+ static boolean image(Context c,String id,byte[] raw)throws Exception{return image(c,id,raw,false);}
+ static boolean image(Context c,String id,byte[] raw,boolean manual)throws Exception{BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(raw,0,raw.length,bounds);if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException("Не удалось прочитать изображение");BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=1;while(Math.max(bounds.outWidth,bounds.outHeight)/options.inSampleSize>1280)options.inSampleSize*=2;return writeBitmap(c,id,BitmapFactory.decodeByteArray(raw,0,raw.length,options),manual?"manual":"instagram");}
+ static JSONObject enrich(Context c,JSONObject item)throws Exception{String id=item.getString("id"),file=item.optString("file");if(!file.isEmpty()){File existingCover=new File(new File(c.getFilesDir(),"thumbs"),id+".jpg");if(existingCover.isFile()&&existingCover.length()>0)return new JSONObject().put("status","local").put("description",item.optString("description"));boolean thumb=false;MediaMetadataRetriever retriever=new MediaMetadataRetriever();try{retriever.setDataSource(new File(c.getFilesDir(),file).getAbsolutePath());Bitmap frame=android.os.Build.VERSION.SDK_INT>=27?retriever.getScaledFrameAtTime(1000000,MediaMetadataRetriever.OPTION_CLOSEST_SYNC,640,640):retriever.getFrameAtTime();if(frame==null)frame=retriever.getFrameAtTime();thumb=writeBitmap(c,id,frame);}finally{retriever.release();}return new JSONObject().put("thumb",thumb).put("status","local").put("description",item.optString("description"));}
+  if(PlatformLinks.source(item.optString("url")).equals("threads")){JSONObject result=ThreadsMedia.metadata(item.optString("url"));boolean thumb=false;String cover=result.optString("imageUrl");if(!cover.isEmpty()&&!item.optBoolean("thumbManual"))try{thumb=image(c,id,WebMedia.get(cover,true,""));}catch(Exception error){result.put("coverError","cover_unavailable");}return result.put("thumb",thumb);}
+  if(PlatformLinks.external(item.optString("url"))){JSONObject result=PlatformExtractor.metadata(c,item.optString("url"));boolean thumb=false;String cover=result.optString("imageUrl");if(!cover.isEmpty()&&!item.optBoolean("thumbManual"))try{thumb=image(c,id,PlatformExtractor.image(cover));}catch(Exception e){result.put("coverError","cover_unavailable");}return result.put("thumb",thumb);}
+  String cookie=CookieManager.getInstance().getCookie("https://www.instagram.com/");if(cookie!=null&&cookie.contains("sessionid=")){try{JSONObject info=new JSONObject(new String(get("https://www.instagram.com/api/v1/media/"+mediaId(item.getString("url"))+"/info/",false),"UTF-8"));JSONObject media=info.getJSONArray("items").getJSONObject(0);if(media.optJSONArray("video_versions")==null){JSONArray carousel=media.optJSONArray("carousel_media");if(carousel!=null)for(int i=0;i<carousel.length();i++)if(carousel.getJSONObject(i).optJSONArray("video_versions")!=null){JSONObject first=carousel.getJSONObject(i);first.put("caption",media.opt("caption"));media=first;break;}}JSONArray versions=media.getJSONArray("video_versions");JSONObject result=Smart.analyze(media.optJSONObject("caption")==null?"":media.getJSONObject("caption").optString("text"));boolean thumb=false;if(!item.optBoolean("thumbManual")){try{String cover=media.getJSONObject("image_versions2").getJSONArray("candidates").getJSONObject(0).getString("url");thumb=image(c,id,get(cover,true));}catch(Exception ignored){}}return result.put("videoUrl",versions.getJSONObject(0).getString("url")).put("thumb",thumb).put("status","metadata");}catch(Exception ignored){}}
+  JSONObject data=WebMedia.parse(new String(get(item.getString("url"),false),"UTF-8"));if(data.optString("videoUrl").isEmpty()){try{JSONObject embed=WebMedia.parse(new String(get(item.getString("url")+"embed/captioned/",false),"UTF-8"));data=WebMedia.combine(data,embed);}catch(Exception ignored){}}
+  String caption=data.optString("description");if(caption.isEmpty())caption=item.optString("description");JSONObject result=Smart.analyze(caption);boolean thumb=false;if(!item.optBoolean("thumbManual")){String cover=data.optString("imageUrl");if(!cover.isEmpty()&&!cover.contains("rsrc.php")&&!cover.contains("instagram.ico"))try{thumb=image(c,id,get(cover,true));}catch(Exception e){result.put("coverError","cover_unavailable");}}return result.put("thumb",thumb).put("videoUrl",data.optString("videoUrl")).put("status",caption.isEmpty()?(thumb?"cover_only":"unavailable"):"metadata").put("errorReason",caption.isEmpty()&&!thumb?"no_metadata":"");
+ }
+
+ static boolean restoreCover(Context c,JSONObject item)throws Exception{if(item.optBoolean("thumbManual")||Store.canonical(item.optString("url")).isEmpty())return false;JSONObject request=new JSONObject(item.toString()).put("file","");JSONObject result=enrich(c,request);return result.optBoolean("thumb");}
+
+ static String mediaId(String url)throws Exception{String code=Store.canonical(url).replaceAll("/$","");code=code.substring(code.lastIndexOf('/')+1);BigInteger id=BigInteger.ZERO;String alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";for(int i=0;i<code.length();i++){int digit=alphabet.indexOf(code.charAt(i));if(digit<0)throw new IOException("Некорректная ссылка");id=id.multiply(BigInteger.valueOf(64)).add(BigInteger.valueOf(digit));}return id.toString();}
+ static String jsonString(String html,String key){return WebMedia.string(html,key);}
+ static String versionsUrl(String html,String key){return WebMedia.versions(html,key);}
+ static String download(Context c,String value)throws Exception{return download(c,value,null);}
+ static String download(Context c,String value,WebMedia.Progress progress)throws Exception{File file=new File(c.getFilesDir(),java.util.UUID.randomUUID().toString()+".mp4.part");try{WebMedia.downloadTo(value,file,progress);MediaMetadataRetriever retriever=new MediaMetadataRetriever();try{retriever.setDataSource(file.getAbsolutePath());if(!"yes".equals(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO)))throw new IOException("unsupported_video");}finally{retriever.release();}File complete=new File(c.getFilesDir(),file.getName().replace(".part",""));if(!file.renameTo(complete))throw new IOException("archive_write_failed");return complete.getName();}catch(Exception e){file.delete();throw e;}}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/Failures.java
+========================================================================
+package com.reelkeep.app;
+final class Failures{
+ static String message(Throwable error){while(error.getCause()!=null)error=error.getCause();String code=String.valueOf(error.getMessage());if(code.contains("wifi_required"))return "Ожидание Wi-Fi";if(code.contains("offline"))return "Нет подключения к интернету";if(code.contains("download_cancelled"))return "Загрузка отменена";if(code.contains("storage_low"))return "Недостаточно свободного места";if(code.contains("source_login_required"))return "Источник требует входа или проверку доступа";if(code.contains("source_unavailable"))return "Видео удалено или недоступно";if(code.contains("video_unavailable"))return "В этой публикации не найдено доступное видео";if(code.contains("video_too_large"))return "Видео превышает лимит 300 МБ";if(code.contains("timeout"))return "Источник не ответил вовремя";return "Не удалось загрузить видео. Можно повторить.";}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/InstagramActivity.java
+========================================================================
+package com.reelkeep.app;
+import android.app.*;import android.os.*;import android.graphics.Color;import android.webkit.*;import android.widget.*;import android.net.Uri;
+public class InstagramActivity extends Activity{
+ WebView web;
+ public void onCreate(Bundle state){super.onCreate(state);LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);layout.setBackgroundColor(0xfff6f5f1);TextView title=new TextView(this);title.setText("Официальный Instagram · сессия на телефоне");title.setPadding(18,15,18,8);title.setTextColor(0xff325a46);title.setTextSize(13);Button done=new Button(this);done.setText("Готово — вернуться в библиотеку");done.setOnClickListener(v->{CookieManager.getInstance().flush();finish();});layout.addView(title);layout.addView(done);web=new WebView(this);layout.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(layout);web.getSettings().setJavaScriptEnabled(true);web.getSettings().setDomStorageEnabled(true);web.getSettings().setAllowFileAccess(false);web.getSettings().setAllowContentAccess(false);web.getSettings().setSaveFormData(false);CookieManager.getInstance().setAcceptCookie(true);CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);web.setWebViewClient(new WebViewClient(){public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest request){Uri u=request.getUrl();String h=u.getHost();boolean allowed="https".equals(u.getScheme())&&h!=null&&(h.equals("instagram.com")||h.endsWith(".instagram.com"));if(!allowed)Toast.makeText(InstagramActivity.this,"Вход доступен только на instagram.com",Toast.LENGTH_SHORT).show();return !allowed;}});web.loadUrl("https://www.instagram.com/accounts/login/");}
+ public void onBackPressed(){CookieManager.getInstance().flush();finish();}protected void onDestroy(){if(web!=null)web.destroy();super.onDestroy();}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/Lang.java
+========================================================================
+package com.reelkeep.app;
+import android.content.Context;import org.json.*;import java.io.*;
+final class Lang{
+ static JSONObject english;
+ static synchronized String text(Context c,String value){if(value==null)return "";if(!c.getSharedPreferences("preferences",0).getString("language","en").equals("en"))return value;try{if(english==null){InputStream in=c.getAssets().open("locales/en.json");ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)out.write(b,0,n);in.close();english=new JSONObject(out.toString("UTF-8"));}return english.optString(value,value);}catch(Exception e){return value;}}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/MainActivity.java
+========================================================================
+package com.reelkeep.app;
+import android.app.*;import android.os.*;import android.content.*;import android.net.Uri;import android.view.*;import android.webkit.*;import android.widget.*;import org.json.*;import java.io.*;import java.util.*;import java.util.regex.*;import java.util.concurrent.*;
+public class MainActivity extends Activity{
+ final java.util.concurrent.atomic.AtomicBoolean repairingCovers=new java.util.concurrent.atomic.AtomicBoolean();final Runnable mediaListener=()->refresh();String versionName="";boolean resumed=false;WebView web;Store store;String pending="",pendingItem="",pendingOptions="";boolean ready=false;static final int PICK=10,EXPORT=11,IMPORT=12,THUMB=13,EXPORT_VIDEO=14;String thumbnailId="",exportId="";final ExecutorService work=Executors.newSingleThreadExecutor();final Set<String> busy=Collections.synchronizedSet(new HashSet<String>());
+ public void onCreate(Bundle b){super.onCreate(b);try{versionName=getPackageManager().getPackageInfo(getPackageName(),0).versionName;}catch(Exception ignored){}store=Store.shared(this);MediaDepot.listeners.add(mediaListener);try{MediaDepot.recover(this);}catch(Exception ignored){}getWindow().setStatusBarColor(0xfff8f9f7);getWindow().setNavigationBarColor(0xfff8f9f7);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);web=new WebView(this);web.setOnLongClickListener(view->{WebView.HitTestResult hit=web.getHitTestResult();if(hit!=null&&hit.getType()==WebView.HitTestResult.EDIT_TEXT_TYPE)return false;web.evaluateJavascript("window.onNativeLongPress && window.onNativeLongPress()",null);return true;});web.setBackgroundColor(0xfff8f9f7);setContentView(web);web.getSettings().setJavaScriptEnabled(true);web.getSettings().setAllowFileAccess(false);web.getSettings().setAllowContentAccess(false);web.getSettings().setAllowFileAccessFromFileURLs(false);web.getSettings().setAllowUniversalAccessFromFileURLs(false);web.addJavascriptInterface(new Bridge(),"Library");web.setWebViewClient(new WebViewClient(){public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest r){Uri u=r.getUrl();if("reelkeep.local".equals(u.getHost())){String path=u.getPath();try{if(path!=null&&path.matches("/thumb/[a-f0-9-]{36}\\.jpg")){File f=new File(new File(getFilesDir(),"thumbs"),path.substring(7));return new WebResourceResponse("image/jpeg",null,new FileInputStream(f));}}catch(Exception ignored){}return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(new byte[0]));}return null;}public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){return true;}public void onPageFinished(WebView v,String u){ready=true;deliver();if(!pendingItem.isEmpty()){String item=pendingItem;pendingItem="";web.evaluateJavascript("window.ReelWelcome && window.ReelWelcome.interrupt();window.reload();window.editItem("+JSONObject.quote(item)+")",null);}}});applyAppearance();web.loadUrl("file:///android_asset/index.html");handle(getIntent());}
+ protected void onNewIntent(Intent i){super.onNewIntent(i);setIntent(i);handle(i);deliver();}
+ void handle(Intent i){String options=i.getStringExtra("optionsItem");if(options!=null){i.removeExtra("optionsItem");if(ready)web.evaluateJavascript("window.ReelWelcome && window.ReelWelcome.interrupt();window.reload();window.openItemMenu("+JSONObject.quote(options)+")",null);else pendingOptions=options;}if(Intent.ACTION_SEND.equals(i.getAction())){if(i.getType()!=null&&i.getType().startsWith("video/")){Uri u=i.getParcelableExtra(Intent.EXTRA_STREAM);if(u!=null)copy(u);}else pending=i.getStringExtra(Intent.EXTRA_TEXT)==null?"":i.getStringExtra(Intent.EXTRA_TEXT);}}
+ void deliver(){if(ready&&!pendingOptions.isEmpty()){String value=pendingOptions;pendingOptions="";web.evaluateJavascript("window.ReelWelcome && window.ReelWelcome.interrupt();window.reload();window.openItemMenu("+JSONObject.quote(value)+")",null);}if(!pending.isEmpty()&&web!=null&&ready){String text=pending;pending="";web.evaluateJavascript("window.ReelWelcome && window.ReelWelcome.interrupt();window.shared && window.shared("+JSONObject.quote(text)+")",null);}}
+ void send(String message){runOnUiThread(()->{if(web!=null&&ready&&!isDestroyed())web.evaluateJavascript("window.notice && window.notice("+JSONObject.quote(Lang.text(this,message))+")",null);});}
+ void refresh(){runOnUiThread(()->{if(resumed&&web!=null&&ready&&!isDestroyed())web.evaluateJavascript("window.reload && window.reload()",null);});}
+ void copy(Uri uri){send("Импортирую видео…");new Thread(()->{String id=UUID.randomUUID().toString();File f=new File(getFilesDir(),id+".mp4");try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(f)){byte[] buf=new byte[65536];int n;long size=0;while((n=in.read(buf))!=-1){size+=n;if(size>1024L*1024*1024)throw new IOException("Видео больше 1 ГБ");out.write(buf,0,n);}JSONObject item=new JSONObject().put("title","Видео с телефона").put("file",f.getName()).put("category","Без категории").put("url","").put("note","").put("tags","");String result=store.save(item);JSONObject saved=new JSONObject(result);final String savedId=saved.getString("id");enrich(savedId);runOnUiThread(()->{if(!ready){pendingItem=savedId;return;}web.evaluateJavascript("window.ReelWelcome && window.ReelWelcome.interrupt();window.reload();window.editItem("+JSONObject.quote(savedId)+")",null);});}catch(Exception e){f.delete();send("Не удалось импортировать видео: "+e.getMessage());}},"video-import").start();}
+ protected void onActivityResult(int req,int result,Intent data){super.onActivityResult(req,result,data);if(result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();if(req==EXPORT)send("Создаю копию с видео и обложками…");if(req==IMPORT)send("Восстанавливаю резервную копию…");if(req==EXPORT_VIDEO){final String id=exportId;new Thread(()->{try{JSONObject item=store.find(id);try(InputStream in=new FileInputStream(new File(getFilesDir(),item.getString("file")));OutputStream out=getContentResolver().openOutputStream(uri)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)out.write(b,0,n);}send("Видео сохранено в выбранную папку");}catch(Exception e){send("Не удалось экспортировать видео");}},"video-export").start();return;}if(req==THUMB){final String id=thumbnailId;work.execute(()->{try{ByteArrayOutputStream out=new ByteArrayOutputStream();try(InputStream in=getContentResolver().openInputStream(uri)){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){if(out.size()+n>20000000)throw new IOException("Изображение больше 20 МБ");out.write(b,0,n);}}if(Enrichment.image(this,id,out.toByteArray(),true)){store.patch(id,new JSONObject().put("thumbManual",true));refresh();send("Обложка сохранена");}}catch(Exception e){send("Не удалось создать обложку");}});return;}if(req==PICK){copy(uri);return;}new Thread(()->{try{if(req==EXPORT){try(OutputStream out=getContentResolver().openOutputStream(uri)){int videos=Archive.write(store,out);send("Полная копия сохранена · видео: "+videos);}}if(req==IMPORT){try(PushbackInputStream in=new PushbackInputStream(getContentResolver().openInputStream(uri),4)){byte[] head=new byte[4];int bytes=in.read(head);if(bytes>0)in.unread(head,0,bytes);int count;if(bytes>=2&&head[0]=='P'&&head[1]=='K')count=Archive.restore(store,in);else{ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){if(out.size()+n>5000000)throw new IOException("Файл слишком большой");out.write(b,0,n);}count=store.merge(new String(out.toByteArray(),"UTF-8"));}refresh();send("Восстановлено записей: "+count);}}}catch(Exception e){send("Ошибка: "+e.getMessage());}},"catalog-file").start();}
+ void enrich(String id){if(!busy.add(id))return;try{store.patch(id,new JSONObject().put("status","queued"));refresh();}catch(Exception e){busy.remove(id);return;}work.execute(()->{try{store.patch(id,new JSONObject().put("status","loading"));refresh();JSONObject result;try{result=MediaDepot.prepare(this,id,false).get();}catch(Exception e){result=new JSONObject().put("status","unavailable").put("errorReason",String.valueOf(e.getCause()!=null?e.getCause().getMessage():e.getMessage()));}JSONObject item=store.find(id);if(!item.optString("downloadStatus").equals("cancelled")&&!result.optString("videoUrl").isEmpty()&&MediaDepot.local(this,item)==null&&getSharedPreferences("preferences",0).getBoolean("autoArchive",true))MediaDepot.download(this,id,false);String ocrText=item.optString("ocrText");if(ocrText.isEmpty()&&!result.optString("confidence").equals("high")){ocrText=VisualText.read(this,id);if(!ocrText.isEmpty())store.patch(id,new JSONObject().put("ocrText",ocrText));}String description=result.optString("description",item.optString("description"));if(description.isEmpty())description=item.optString("description");if(!item.optString("note").isEmpty())description+=" "+item.optString("note");if(description.isEmpty()&&!item.optString("title").equals("Сохранённый Reels")&&!item.optString("title").equals("Видео с телефона"))description=item.optString("title");JSONObject analysis=new JSONObject();if(result.has("errorReason"))analysis.put("errorReason",result.get("errorReason"));if(!ocrText.isEmpty())description+="\n"+ocrText;if(!description.trim().isEmpty())try{JSONObject ai=Semantic.analyze(this,description);for(String key:new String[]{"title","description","summary","tags","category","confidence","analyzer","analysisVersion"})if(ai.has(key))analysis.put(key,(key.equals("title")||key.equals("summary"))&&!result.optString(key).isEmpty()?result.get(key):ai.get(key));}catch(Exception ignored){}analysis.put("status",!description.trim().isEmpty()?"metadata":MediaDepot.local(this,store.find(id))!=null?"local":result.optBoolean("thumb")?"cover_only":"unavailable");store.patch(id,analysis);refresh();}catch(Exception e){android.util.Log.w("Reelkeep","Preparation stopped",e);}finally{busy.remove(id);refresh();}});}
+ boolean darkTheme(){String mode=getSharedPreferences("preferences",0).getString("theme","graphite");return mode.equals("graphite")||mode.equals("system")&&(getResources().getConfiguration().uiMode&48)==32;}
+ void applyAppearance(){boolean dark=darkTheme();int color=dark?0xff202723:0xfff7f9f4;getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);if(web!=null)web.setBackgroundColor(color);}
+ boolean incomingForWelcome(){return Intent.ACTION_SEND.equals(getIntent().getAction())||!pendingOptions.isEmpty()||!pendingItem.isEmpty();}
+ boolean reducedMotion(){try{return android.provider.Settings.Global.getFloat(getContentResolver(),android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f;}catch(Exception ignored){return false;}}
+ class Bridge{
+ @JavascriptInterface public String startup(){try{return new JSONObject().put("welcomeRequired",!getSharedPreferences("preferences",0).getBoolean("onboarding_v1",false)&&!incomingForWelcome()).put("incomingShare",incomingForWelcome()).put("reduceMotion",reducedMotion()).put("theme",darkTheme()?"graphite":"light").toString();}catch(Exception e){return "{}";}}
+ @JavascriptInterface public void completeOnboarding(){getSharedPreferences("preferences",0).edit().putBoolean("onboarding_v1",true).apply();}
+
+ @JavascriptInterface public String favorite(String id,boolean favorite){try{return store.favorite(id,favorite);}catch(Exception e){return error(e);}}
+ @JavascriptInterface public String copyLink(String id){try{String url=Store.canonical(store.find(id).optString("url"));if(url.isEmpty())throw new IOException("Link unavailable");android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Video link",url));return "{}";}catch(Exception e){return error(e);}}
+
+ @JavascriptInterface public void gridColumns(int columns){if(columns>=2&&columns<=4)getSharedPreferences("preferences",0).edit().putInt("gridColumns",columns).apply();}
+
+ @JavascriptInterface public void haptic(){runOnUiThread(()->{if(web!=null)web.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);});}
+
+ @JavascriptInterface public void wifiOnly(boolean enabled){getSharedPreferences("preferences",0).edit().putBoolean("wifiOnly",enabled).apply();}
+ @JavascriptInterface public void cancelDownload(String id){MediaDepot.downloads.cancel(id);try{store.patch(id,new JSONObject().put("downloadStatus","cancelled").put("errorReason","download_cancelled"));}catch(Exception ignored){}refresh();}
+ @JavascriptInterface public String releaseFile(String id){try{if(MediaDepot.downloads.find(id)!=null)throw new IOException("download_in_progress");store.releaseFile(id);return "{}";}catch(Exception e){return error(e);}}
+
+ @JavascriptInterface public String canonical(String text){return Store.canonical(text);}
+
+ @JavascriptInterface public String appearance(String language,String theme){if(!language.equals("en")&&!language.equals("ru"))return "{}";if(!theme.equals("graphite")&&!theme.equals("light")&&!theme.equals("system"))return "{}";getSharedPreferences("preferences",0).edit().putString("language",language).putString("theme",theme).apply();runOnUiThread(()->applyAppearance());return read();}
+
+  @JavascriptInterface public String read(){try{JSONObject result=new JSONObject(store.read()).put("onboardingDone",getSharedPreferences("preferences",0).getBoolean("onboarding_v1",false)).put("incomingShare",incomingForWelcome()).put("reduceMotion",reducedMotion()).put("appVersion",versionName).put("storageBytes",store.storageBytes()).put("wifiOnly",getSharedPreferences("preferences",0).getBoolean("wifiOnly",false)).put("language",getSharedPreferences("preferences",0).getString("language","en")).put("theme",getSharedPreferences("preferences",0).getString("theme","graphite")).put("effectiveTheme",darkTheme()?"graphite":"light").put("gridColumns",getSharedPreferences("preferences",0).getInt("gridColumns",0)).put("showTitles",getSharedPreferences("preferences",0).getBoolean("showTitles",false)).put("downloadProgress",MediaDepot.progress()).put("instagramConnected",android.webkit.CookieManager.getInstance().getCookie("https://www.instagram.com/")!=null&&android.webkit.CookieManager.getInstance().getCookie("https://www.instagram.com/").contains("sessionid=")).put("autoArchive",getSharedPreferences("preferences",0).getBoolean("autoArchive",true));JSONArray items=result.getJSONArray("items");for(int i=0;i<items.length();i++){JSONObject item=items.getJSONObject(i);item.put("playReady",!item.optString("file").isEmpty()||Prepared.usable(item,System.currentTimeMillis()));item.remove("videoUrl");item.remove("videoPreparedAt");}return result.toString();}catch(Exception e){return error(e);}}
+
+ @JavascriptInterface public String retryUnresolved(){try{JSONArray items=new JSONObject(store.read()).getJSONArray("items");int count=0;for(int i=0;i<items.length();i++){JSONObject item=items.getJSONObject(i);if(!item.optBoolean("categoryLocked")||!item.optBoolean("titleLocked")||!item.optBoolean("thumb")){enrich(item.getString("id"));count++;}}return new JSONObject().put("count",count).toString();}catch(Exception e){return error(e);}}
+ @JavascriptInterface public void restoreCovers(){if(!repairingCovers.compareAndSet(false,true)){send("Обложки уже обновляются");return;}send("Получаю оригинальные обложки Instagram…");work.execute(()->{int restored=0,failed=0;try{JSONArray items=new JSONObject(store.read()).getJSONArray("items");for(int i=0;i<items.length();i++){JSONObject item=items.getJSONObject(i);if(item.optBoolean("thumbManual")||Store.canonical(item.optString("url")).isEmpty()||CoverPolicy.source(item).equals("instagram"))continue;try{if(Enrichment.restoreCover(MainActivity.this,store.find(item.getString("id"))))restored++;else failed++;refresh();}catch(Exception e){failed++;}}send("Оригинальные обложки: "+restored+(failed>0?" · недоступно: "+failed:""));}catch(Exception e){send("Не удалось обновить обложки");}finally{repairingCovers.set(false);refresh();}});}
+ @JavascriptInterface public void enrichItem(String id){enrich(id);}
+ @JavascriptInterface public String suggest(String text){try{return Smart.analyze(text).toString();}catch(Exception e){return error(e);}}
+ @JavascriptInterface public void setShowTitles(boolean show){getSharedPreferences("preferences",0).edit().putBoolean("showTitles",show).apply();}
+ @JavascriptInterface public void autoArchive(boolean enabled){getSharedPreferences("preferences",0).edit().putBoolean("autoArchive",enabled).apply();}
+ @JavascriptInterface public void thumbnail(String id){thumbnailId=id;runOnUiThread(()->startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE),THUMB));}
+  @JavascriptInterface public String save(String json){try{return store.save(new JSONObject(json));}catch(Exception e){return error(e);}}
+  @JavascriptInterface public void instagram(boolean connect){runOnUiThread(()->{if(connect)startActivity(new Intent(MainActivity.this,InstagramActivity.class));else{android.webkit.CookieManager.getInstance().removeAllCookies(done->{android.webkit.CookieManager.getInstance().flush();refresh();send("Сессия Instagram удалена с телефона");});}});}
+  @JavascriptInterface public String bulk(String ids,String action,String category){try{return new JSONObject().put("count",store.bulk(new JSONArray(ids),action,category)).toString();}catch(Exception e){return error(e);}}
+  @JavascriptInterface public String remove(String id){try{store.remove(id);return "{}";}catch(Exception e){return error(e);}}
+  @JavascriptInterface public String category(String action,String name,String next){try{store.category(action,name,next);return "{}";}catch(Exception e){return error(e);}}
+  @JavascriptInterface public void pick(){runOnUiThread(()->startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("video/*").addCategory(Intent.CATEGORY_OPENABLE),PICK));}
+  @JavascriptInterface public void shareApp(){runOnUiThread(()->{try{Intent share=ApkSharing.intent(MainActivity.this);Intent chooser=Intent.createChooser(share,Lang.text(MainActivity.this,"Поделиться приложением"));chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);chooser.setClipData(share.getClipData());startActivity(chooser);}catch(Exception error){send(error.getMessage()==null?"Не удалось поделиться APK":error.getMessage());}});}
+ @JavascriptInterface public void shareVideo(String id){runOnUiThread(()->{try{Intent share=VideoSharing.intent(MainActivity.this,id);Intent chooser=Intent.createChooser(share,Lang.text(MainActivity.this,"Поделиться видео"));chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);chooser.setClipData(share.getClipData());startActivity(chooser);}catch(Exception e){send("Не удалось поделиться видео. Проверь, что оно скачано.");}});}
+ @JavascriptInterface public void exportVideo(String id){runOnUiThread(()->{try{JSONObject item=store.find(id);if(item.optString("file").isEmpty())throw new IOException("Сначала скачай видео");exportId=id;String title=item.optString("title","Reelkeep").replaceAll("[^\\p{L}\\p{N} _-]","");if(title.length()>70)title=title.substring(0,70);startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("video/mp4").putExtra(Intent.EXTRA_TITLE,title+".mp4"),EXPORT_VIDEO);}catch(Exception e){send(e.getMessage());}});}
+  @JavascriptInterface public void backup(boolean restore){runOnUiThread(()->{Intent i=new Intent(restore?Intent.ACTION_OPEN_DOCUMENT:Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(restore?"*/*":"application/zip");if(restore)i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/zip","application/json"});if(!restore)i.putExtra(Intent.EXTRA_TITLE,"reelkeep-backup.zip");startActivityForResult(i,restore?IMPORT:EXPORT);});}
+  @JavascriptInterface public void play(String id){runOnUiThread(()->{try{store.find(id);startActivity(new Intent(MainActivity.this,PlayerActivity.class).putExtra("id",id));}catch(Exception e){send(e.getMessage());}});}
+  @JavascriptInterface public void open(String id){play(id);}
+  @JavascriptInterface public void download(String id){MediaDepot.download(MainActivity.this,id,true);}
+  @JavascriptInterface public void openSource(String id){runOnUiThread(()->{try{String url=Store.canonical(store.find(id).optString("url"));if(!url.isEmpty())startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(Exception e){send("Не удалось открыть оригинал");}});}
+
+ }
+ String error(Exception e){try{return new JSONObject().put("error",e.getMessage()).toString();}catch(Exception x){return "{}";}}
+ protected void onResume(){super.onResume();resumed=true;if(web!=null&&ready)refresh();}
+ protected void onPause(){resumed=false;super.onPause();}
+ protected void onDestroy(){MediaDepot.listeners.remove(mediaListener);work.shutdown();ready=false;if(web!=null){web.removeJavascriptInterface("Library");web.destroy();web=null;}super.onDestroy();}
+ public void onBackPressed(){web.evaluateJavascript("window.back && window.back()",null);}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/MediaDepot.java
+========================================================================
+package com.reelkeep.app;
+import android.content.Context;import org.json.*;import java.io.*;import java.util.*;import java.util.concurrent.*;
+public final class MediaDepot {
+ static boolean recovered=false;static synchronized void recover(Context c)throws Exception{if(!recovered){Store.shared(c).recover();recovered=true;JSONArray items=new JSONObject(Store.shared(c).read()).getJSONArray("items");for(int i=0;i<items.length();i++)if(items.getJSONObject(i).optString("downloadStatus").equals("interrupted"))download(c,items.getJSONObject(i).getString("id"),false);}}
+ static final DownloadQueue downloads=new DownloadQueue();static final ExecutorService metadata=Executors.newFixedThreadPool(2),covers=Executors.newSingleThreadExecutor();static final Map<String,CompletableFuture<JSONObject>> preparing=new HashMap<>();static final Set<Runnable> listeners=new CopyOnWriteArraySet<>();
+ static synchronized boolean pending(){return !preparing.isEmpty()||!downloads.snapshot().isEmpty();}
+ static void changed(){for(Runnable listener:listeners)try{listener.run();}catch(Exception ignored){}}
+ static File local(Context c,JSONObject item){String name=item.optString("file");if(!name.matches("[a-f0-9-]{36}\\.mp4"))return null;File file=new File(c.getFilesDir(),name);return file.isFile()&&file.length()>0?file:null;}
+ static synchronized CompletableFuture<JSONObject> prepare(Context context,String id,boolean force){Context c=context.getApplicationContext();Store store=Store.shared(c);try{JSONObject item=store.find(id);if(!force&&Prepared.usable(item,System.currentTimeMillis()))return CompletableFuture.completedFuture(item);}catch(Exception e){CompletableFuture<JSONObject> failed=new CompletableFuture<>();failed.completeExceptionally(e);return failed;}CompletableFuture<JSONObject> old=preparing.get(id);if(old!=null&&!old.isDone())return old;CompletableFuture<JSONObject> result=new CompletableFuture<>();preparing.put(id,result);TransferService.ensure(c);metadata.execute(()->{try{JSONObject item=store.find(id);if(local(c,item)==null&&!item.optString("file").isEmpty()){store.patch(id,new JSONObject().put("file","").put("downloadStatus","link_only"));item=store.find(id);}JSONObject fetched=Enrichment.enrich(c,item);if(!fetched.optString("videoUrl").isEmpty())fetched.put("videoPreparedAt",System.currentTimeMillis());else if(force)fetched.put("videoUrl","").put("videoPreparedAt",0);store.patch(id,fetched);changed();result.complete(fetched);}catch(Exception e){result.completeExceptionally(e);}finally{synchronized(MediaDepot.class){if(preparing.get(id)==result)preparing.remove(id);}}});return result;}
+ static synchronized CompletableFuture<String> download(Context context,String id,boolean urgent){Context c=context.getApplicationContext();Store store=Store.shared(c);DownloadQueue.Job pending=downloads.find(id);if(pending!=null&&!pending.future.isDone())return downloads.submit(id,urgent,pending.work).future;try{File file=local(c,store.find(id));if(file!=null)return CompletableFuture.completedFuture(file.getName());store.patch(id,new JSONObject().put("downloadStatus","queued").put("errorReason",""));}catch(Exception e){CompletableFuture<String> failed=new CompletableFuture<>();failed.completeExceptionally(e);return failed;}
+ DownloadQueue.Job job=downloads.submit(id,urgent,j->{String created="";try{File existing=local(c,store.find(id));if(existing!=null)return existing.getName();if(!NetworkGate.allowed(c))throw new IOException(NetworkGate.ready(c)?"wifi_required":"offline");if(c.getFilesDir().getUsableSpace()<350L*1024*1024)throw new IOException("storage_low");j.stage="preparing";changed();JSONObject item=prepare(c,id,false).get();if(c.getFilesDir().getUsableSpace()<350L*1024*1024)throw new IOException("storage_low");if(j.cancelled)throw new IOException("download_cancelled");String url=item.optString("videoUrl");if(url.isEmpty())throw new IOException("video_unavailable");j.stage="downloading";store.patch(id,new JSONObject().put("downloadStatus","downloading"));changed();for(int attempt=0;attempt<2;attempt++){try{WebMedia.Progress progress=(bytes,total)->{if(j.cancelled||Thread.currentThread().isInterrupted())throw new IOException("download_cancelled");if(!NetworkGate.allowed(c))throw new IOException(NetworkGate.ready(c)?"wifi_required":"offline");store.find(id);j.bytes=bytes;j.total=total;changed();};created=PlatformLinks.external(url)?PlatformExtractor.download(c,url,progress):Enrichment.download(c,url,progress);break;}catch(IOException error){String reason=String.valueOf(error.getMessage());if(attempt>0||!(reason.contains("http_401")||reason.contains("http_403")||reason.contains("http_404")||reason.contains("http_410")))throw error;j.stage="preparing";changed();item=prepare(c,id,true).get();url=item.optString("videoUrl");if(url.isEmpty())throw new IOException("video_unavailable");j.stage="downloading";changed();}}
+ store.patch(id,new JSONObject().put("file",created).put("downloadStatus","local").put("errorReason",""));changed();covers.execute(()->{try{JSONObject saved=store.find(id);File cover=new File(new File(c.getFilesDir(),"thumbs"),id+".jpg");if(!saved.optBoolean("thumbManual")&&(!cover.isFile()||cover.length()==0)){JSONObject thumb=Enrichment.enrich(c,saved);store.patch(id,thumb);changed();}}catch(Exception ignored){}});return created;
+ }catch(Exception e){if(!created.isEmpty())new File(c.getFilesDir(),created).delete();String reason=j.cancelled?"download_cancelled":String.valueOf(e.getMessage());try{store.patch(id,new JSONObject().put("downloadStatus",reason.equals("wifi_required")||reason.equals("offline")?"waiting_network":reason.equals("download_cancelled")?"cancelled":"failed").put("errorReason",reason));}catch(Exception ignored){}changed();throw e;}});TransferService.ensure(c);changed();job.future.whenComplete((value,error)->changed());return job.future;}
+ static JSONObject progress(){JSONObject result=new JSONObject();for(DownloadQueue.Job job:downloads.snapshot())try{result.put(job.id,new JSONObject().put("bytes",job.bytes).put("total",job.total).put("stage",job.stage));}catch(Exception ignored){}return result;}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/NetworkGate.java
+========================================================================
+package com.reelkeep.app;
+import android.content.*;import android.net.*;
+final class NetworkGate{
+ static boolean waiting(Context c){try{org.json.JSONArray items=new org.json.JSONObject(Store.shared(c).read()).getJSONArray("items");for(int i=0;i<items.length();i++)if(items.getJSONObject(i).optString("downloadStatus").equals("waiting_network"))return true;}catch(Exception ignored){}return false;}
+ static void resumeWaiting(Context c){if(!allowed(c))return;try{org.json.JSONArray items=new org.json.JSONObject(Store.shared(c).read()).getJSONArray("items");for(int i=0;i<items.length();i++){org.json.JSONObject item=items.getJSONObject(i);if(item.optString("downloadStatus").equals("waiting_network"))MediaDepot.download(c,item.getString("id"),false);}}catch(Exception ignored){}}
+ static boolean ready(Context c){ConnectivityManager cm=(ConnectivityManager)c.getSystemService(Context.CONNECTIVITY_SERVICE);NetworkCapabilities cap=cm.getNetworkCapabilities(cm.getActiveNetwork());return cap!=null&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);}
+ static boolean allowed(Context c){if(!ready(c))return false;if(!c.getSharedPreferences("preferences",0).getBoolean("wifiOnly",false))return true;ConnectivityManager cm=(ConnectivityManager)c.getSystemService(Context.CONNECTIVITY_SERVICE);NetworkCapabilities cap=cm.getNetworkCapabilities(cm.getActiveNetwork());return cap!=null&&cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/PlatformExtractor.java
+========================================================================
+package com.reelkeep.app;
+import android.content.Context;import org.json.*;import java.io.*;import java.net.*;import java.util.*;import java.util.concurrent.*;import java.util.zip.*;
+/** Pinned on-device extractor; no remote download service or shell interpolation. */
+public final class PlatformExtractor{
+ static final String VERSION="2026.10.26-ejs0.8.0";static final long LIMIT=300L*1024*1024;
+ static synchronized File runtime(Context c)throws Exception{File base=new File(c.getNoBackupFilesDir(),"extractor-"+VERSION);File marker=new File(base,"ready");if(marker.isFile())return base;if(c.getFilesDir().getUsableSpace()<180L*1024*1024)throw new IOException("storage_low");File bin=new File(c.getApplicationInfo().nativeLibraryDir);if(!new File(bin,"libpython.so").isFile())throw new IOException("extractor_runtime_missing");base.mkdirs();try{unpack(c,new File(bin,"libpython.zip.so"),new File(base,"python"));unpack(c,new File(bin,"libffmpeg.zip.so"),new File(base,"ffmpeg"));copy(c,"extractor/yt-dlp",new File(base,"yt-dlp"));copy(c,"extractor/yt_dlp_ejs.whl",new File(base,"yt_dlp_ejs.whl"));try(OutputStream out=new FileOutputStream(marker)){out.write(1);}return base;}catch(Exception e){delete(base);throw e;}}
+ static void copy(Context c,String asset,File to)throws Exception{try(InputStream in=c.getAssets().open(asset);OutputStream out=new FileOutputStream(to)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)out.write(b,0,n);}}
+ static void unpack(Context c,File zip,File to)throws Exception{to.mkdirs();String prefix=to.getCanonicalPath()+File.separator;long size=0;try(ZipInputStream in=new ZipInputStream(new FileInputStream(zip))){ZipEntry e;while((e=in.getNextEntry())!=null){File file=new File(to,e.getName());if(!file.getCanonicalPath().startsWith(prefix))throw new IOException("unsafe_runtime_archive");if(e.isDirectory()){file.mkdirs();continue;}file.getParentFile().mkdirs();try(OutputStream out=new FileOutputStream(file)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1){size+=n;if(size>250L*1024*1024)throw new IOException("runtime_too_large");out.write(b,0,n);}}}}links(c,zip,to);}
+ static void links(Context c,File zip,File to)throws Exception{ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(InputStream in=c.getAssets().open("extractor/runtime-links.json")){byte[] buffer=new byte[4096];int n;while((n=in.read(buffer))!=-1)bytes.write(buffer,0,n);}JSONObject all=new JSONObject(bytes.toString("UTF-8"));JSONObject platform=all.getJSONObject(android.os.Build.SUPPORTED_ABIS[0]);JSONArray links=platform.getJSONArray(zip.getName());String prefix=to.getCanonicalPath()+File.separator;for(int k=0;k<links.length();k++){JSONArray entry=links.getJSONArray(k);File link=new File(to,entry.getString(0));File target=new File(link.getParentFile(),entry.getString(1));if(!link.getCanonicalPath().startsWith(prefix)||!target.getCanonicalPath().startsWith(prefix)||!target.exists())throw new IOException("unsafe_runtime_link");if(!link.delete())throw new IOException("runtime_link_failed");android.system.Os.symlink(entry.getString(1),link.getPath());}}
+
+ static void delete(File file){File[] files=file.listFiles();if(files!=null)for(File child:files)delete(child);file.delete();}
+ interface Line{void read(String line)throws Exception;}
+ static void run(Context c,List<String> options,Line stdout,File transfer,WebMedia.Progress progress,long timeout)throws Exception{File base=runtime(c),bin=new File(c.getApplicationInfo().nativeLibraryDir);List<String> command=new ArrayList<>();Collections.addAll(command,new File(bin,"libpython.so").getPath(),new File(base,"yt-dlp").getPath(),"--ignore-config","--no-cache-dir","--no-playlist","--no-colors","--socket-timeout","15","--retries","2","--extractor-retries","2","--js-runtimes","quickjs:"+new File(bin,"libqjs.so").getPath(),"--ffmpeg-location",new File(bin,"libffmpeg.so").getPath());command.addAll(options);ProcessBuilder builder=new ProcessBuilder(command);Map<String,String> env=builder.environment();env.put("LD_LIBRARY_PATH",new File(base,"python/usr/lib").getPath()+":"+new File(base,"ffmpeg/usr/lib").getPath());env.put("PYTHONHOME",new File(base,"python/usr").getPath());env.put("PYTHONPATH",new File(base,"yt_dlp_ejs.whl").getPath());env.put("SSL_CERT_FILE",new File(base,"python/usr/etc/tls/cert.pem").getPath());env.put("TMPDIR",c.getCacheDir().getPath());env.put("PATH",bin.getPath()+":"+String.valueOf(System.getenv("PATH")));env.put("PYTHONUNBUFFERED","1");Process process=builder.start();StringBuilder error=new StringBuilder();ExecutorService readers=Executors.newFixedThreadPool(2);Future<?> out=readers.submit(()->{try(BufferedReader in=new BufferedReader(new InputStreamReader(process.getInputStream(),"UTF-8"))){String line;while((line=in.readLine())!=null){if(line.length()>8*1024*1024)throw new IOException("metadata_too_large");stdout.read(line);}}catch(Exception e){process.destroy();throw new RuntimeException(e);}});Future<?> err=readers.submit(()->{try(BufferedReader in=new BufferedReader(new InputStreamReader(process.getErrorStream(),"UTF-8"))){String line;while((line=in.readLine())!=null){synchronized(error){if(error.length()<20000)error.append(line).append('\n');}}}catch(Exception ignored){}});long start=System.nanoTime();try{while(!process.waitFor(500,TimeUnit.MILLISECONDS)){if(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-start)>timeout)throw new IOException("extractor_timeout");if(transfer!=null){long bytes=folderBytes(transfer);if(bytes>LIMIT)throw new IOException("video_too_large");if(progress!=null)progress.changed(bytes,0);}}out.get(10,TimeUnit.SECONDS);err.get(10,TimeUnit.SECONDS);if(process.exitValue()!=0){String message=error.toString().toLowerCase(Locale.ROOT);throw new IOException(message.contains("private")||message.contains("unavailable")||message.contains("not available")?"source_unavailable":message.contains("sign in")||message.contains("login")||message.contains("cookies")||message.contains("bot")?"source_login_required":message.contains("size")?"video_too_large":"extractor_failed");}}finally{process.destroy();if(process.isAlive())process.destroyForcibly();readers.shutdownNow();}}
+ static long folderBytes(File file){if(file.isFile())return file.length();long bytes=0;File[] files=file.listFiles();if(files!=null)for(File f:files)bytes+=folderBytes(f);return bytes;}
+ static JSONObject metadata(Context c,String input)throws Exception{String url=PlatformLinks.canonical(input);if(!PlatformLinks.external(url))throw new IOException("unsupported_source");final JSONObject[] result={null};run(c,Arrays.asList("--dump-single-json","--skip-download","--ignore-no-formats-error","--",url),line->{if(line.startsWith("{"))result[0]=new JSONObject(line);},null,null,120000);JSONObject info=result[0];if(info==null)throw new IOException("no_metadata");if(info.optBoolean("is_live")||info.optString("live_status").equals("is_live")||info.optString("_type").equals("playlist"))throw new IOException("live_or_playlist_unsupported");String title=Smart.clean(info.optString("title")),description=Smart.clean(info.optString("description"));JSONObject data=Smart.analyze(title+"\n"+description);if(!title.isEmpty())data.put("title",title);data.put("description",description.isEmpty()?title:description).put("imageUrl",info.optString("thumbnail")).put("videoUrl",url).put("downloadEngine","yt-dlp").put("source",PlatformLinks.source(url)).put("sourceId",info.optString("id")).put("status","metadata");return data;}
+ static String download(Context c,String input,WebMedia.Progress progress)throws Exception{String url=PlatformLinks.canonical(input);if(!PlatformLinks.external(url))throw new IOException("unsupported_source");File stage=new File(c.getCacheDir(),"transfer-"+UUID.randomUUID());stage.mkdirs();try{List<String> args=Arrays.asList("--newline","--no-simulate","--max-filesize","300M","--match-filters","!is_live & duration <= 10800","--format","bv*[height<=720][ext=mp4][vcodec^=avc1]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[ext=mp4]","--merge-output-format","mp4","--output",new File(stage,"video.%(ext)s").getPath(),"--",url);run(c,args,line->{},stage,progress,20*60*1000L);File output=new File(stage,"video.mp4");if(!output.isFile()||output.length()==0)throw new IOException("video_unavailable");if(output.length()>LIMIT)throw new IOException("video_too_large");try(InputStream in=new FileInputStream(output)){byte[] b=new byte[12];if(in.read(b)!=12||b[4]!='f'||b[5]!='t'||b[6]!='y'||b[7]!='p')throw new IOException("not_mp4");}if(progress!=null)progress.changed(output.length(),output.length());File target=new File(c.getFilesDir(),UUID.randomUUID()+".mp4");if(!output.renameTo(target))throw new IOException("storage_failed");return target.getName();}finally{delete(stage);}}
+ static boolean imageHost(URL u){String h=u.getHost().toLowerCase(Locale.ROOT);return u.getProtocol().equals("https")&&u.getUserInfo()==null&&(h.equals("i.ytimg.com")||h.endsWith(".ytimg.com")||h.endsWith(".tiktokcdn.com")||h.endsWith(".tiktokcdn-us.com")||h.endsWith(".tiktokcdn-eu.com")||h.endsWith(".tiktok.com")||h.endsWith(".byteoversea.com")||h.endsWith(".ibytedtos.com")||h.endsWith(".ibyteimg.com"));}
+ static byte[] image(String value)throws Exception{URL url=new URL(value);for(int i=0;i<5;i++){if(!imageHost(url))throw new IOException("unsupported_image_host");HttpURLConnection con=(HttpURLConnection)url.openConnection();con.setInstanceFollowRedirects(false);con.setConnectTimeout(12000);con.setReadTimeout(15000);try{int code=con.getResponseCode();if(code>=300&&code<400){String location=con.getHeaderField("Location");if(location==null)throw new IOException("redirect_missing");url=new URL(url,location);continue;}if(code!=200)throw new IOException("image_unavailable");try(InputStream in=con.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){if(out.size()+n>4000000)throw new IOException("image_too_large");out.write(b,0,n);}return out.toByteArray();}}finally{con.disconnect();}}throw new IOException("too_many_redirects");}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/PlatformLinks.java
+========================================================================
+package com.reelkeep.app;
+import java.net.*;import java.util.*;import java.util.regex.*;
+/** One normalization boundary for shares, storage and extraction. */
+public final class PlatformLinks{
+ static String canonical(String text){if(text==null)return "";Matcher m=Pattern.compile("https?://[^\\s<>\\\"]+",Pattern.CASE_INSENSITIVE).matcher(text);while(m.find()){String raw=m.group().replaceAll("[),.;]+$","");try{URI u=new URI(raw);if(u.getUserInfo()!=null||u.getPort()!=-1)continue;String h=u.getHost();if(h==null)continue;h=h.toLowerCase(Locale.ROOT);String p=u.getPath();if(p==null)continue;Matcher route;
+ if(h.equals("instagram.com")||h.equals("www.instagram.com")||h.equals("m.instagram.com")){route=Pattern.compile("^/(reel|reels|p|tv)/([A-Za-z0-9_-]+)(?:/|$)",Pattern.CASE_INSENSITIVE).matcher(p);if(route.find())return "https://www.instagram.com/"+(route.group(1).equalsIgnoreCase("reels")?"reel":route.group(1).toLowerCase(Locale.ROOT))+"/"+route.group(2)+"/";}
+ if(h.equals("threads.com")||h.equals("www.threads.com")||h.equals("threads.net")||h.equals("www.threads.net")){route=Pattern.compile("^/@([A-Za-z0-9._-]+)/post/([A-Za-z0-9_-]+)/*$").matcher(p);if(route.matches())return "https://www.threads.com/@"+route.group(1).toLowerCase(Locale.ROOT)+"/post/"+route.group(2);}
+ if(h.equals("youtube.com")||h.equals("www.youtube.com")||h.equals("m.youtube.com")||h.equals("music.youtube.com")||h.equals("youtu.be")||h.equals("www.youtu.be")){String id="";if(h.endsWith("youtu.be")){id=p.replaceFirst("^/","").split("/")[0];}else if(p.equals("/watch")){String q=u.getRawQuery();if(q!=null)for(String pair:q.split("&")){String[] kv=pair.split("=",2);if(kv.length==2&&kv[0].equals("v"))id=URLDecoder.decode(kv[1],"UTF-8");}}else{route=Pattern.compile("^/(?:shorts|embed)/([A-Za-z0-9_-]{11})(?:/|$)").matcher(p);if(route.find())id=route.group(1);}if(id.matches("[A-Za-z0-9_-]{11}"))return "https://www.youtube.com/watch?v="+id;}
+ if(h.equals("tiktok.com")||h.equals("www.tiktok.com")||h.equals("m.tiktok.com")){route=Pattern.compile("^/@([A-Za-z0-9._-]+)/video/([0-9]{10,25})(?:/|$)").matcher(p);if(route.find())return "https://www.tiktok.com/@"+route.group(1)+"/video/"+route.group(2);route=Pattern.compile("^/t/([A-Za-z0-9]+)(?:/|$)").matcher(p);if(route.find())return "https://www.tiktok.com/t/"+route.group(1)+"/";}
+ if(h.equals("vm.tiktok.com")||h.equals("vt.tiktok.com")){route=Pattern.compile("^/([A-Za-z0-9]+)(?:/|$)").matcher(p);if(route.find())return "https://"+h+"/"+route.group(1)+"/";}
+ }catch(Exception ignored){}}return "";}
+ static String source(String text){String url=canonical(text);return url.contains("threads.com/")?"threads":url.contains("youtube.com/")?"youtube":url.contains("tiktok.com/")?"tiktok":url.contains("instagram.com/")?"instagram":"local";}
+ static boolean external(String text){String source=source(text);return source.equals("youtube")||source.equals("tiktok");}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/PlaybackState.java
+========================================================================
+package com.reelkeep.app;
+/** Shared bounds/eligibility rules for durable playback position. */
+final class PlaybackState{
+ static int clamp(long position,long duration){return (int)Math.max(0,Math.min(Math.min(duration,Integer.MAX_VALUE),position));}
+ static int resumeAt(long position,long duration,boolean completed){if(completed||duration<=0)return 0;int p=clamp(position,duration);return p>=3000&&duration-p>Math.max(3000,duration/20)?p:0;}
+}
+

@@ -1,0 +1,736 @@
+
+========================================================================
+FILE: app/src/com/reelkeep/app/PlayerActivity.java
+========================================================================
+package com.reelkeep.app;
+import android.app.*;import android.os.*;import android.content.*;import android.media.*;import android.graphics.*;import android.graphics.Typeface;import android.graphics.drawable.GradientDrawable;import android.view.*;import android.widget.*;import android.net.Uri;import org.json.*;import java.io.File;
+public class PlayerActivity extends Activity{
+ PlayerInfo infoPanel;boolean infoOpen=false;SurfaceLighting surfaceLighting;float swipeX,swipeY;long swipeTime;boolean swipeArmed;
+ ImageView poster;boolean completed=false;long lastSaved=0;final java.util.concurrent.ExecutorService history=java.util.concurrent.Executors.newSingleThreadExecutor();
+ VideoView video;FrameLayout root;LinearLayout loader;TextView status,amount;ProgressBar progress;Button retry,information;PlayerGlyphButton back,mute,more;PlayerGlassRail rail;LinearLayout controls;SeekBar seek;PlayerGlyphButton toggle;TextView time,durationTime,previewLabel;boolean scrubbing=false;Typeface font;String id,file;int position=0;boolean ready=false,resumed=false,wantPlay=true,muted=false,focusResume=false;MediaPlayer media;AudioManager audio;AudioFocusRequest audioRequest;final Handler handler=new Handler();
+ int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
+ TextView text(String value,int size,int color){TextView t=new TextView(this);t.setText(Lang.text(PlayerActivity.this,value));t.setTextSize(size);t.setTextColor(color);t.setGravity(Gravity.CENTER);t.setTypeface(font!=null?font:Typeface.create("sans-serif-medium",Typeface.NORMAL));return t;}
+ Button pill(String label){Button button=new Button(this);button.setAllCaps(false);button.setText(Lang.text(this,label));button.setTextSize(12);button.setTextColor(0xfff4f6f1);if(font!=null)button.setTypeface(font);button.setMinHeight(dp(48));GradientDrawable bg=new GradientDrawable();bg.setCornerRadius(dp(18));bg.setColor(0x5526332b);bg.setStroke(dp(1),0x30ffffff);button.setBackground(bg);return button;}
+ void options(){if(id==null)return;startActivity(new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("optionsItem",id));finish();}
+ public void onCreate(Bundle state){super.onCreate(state);surfaceLighting=new SurfaceLighting(this);getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.BLACK));setVolumeControlStream(AudioManager.STREAM_MUSIC);try{MediaDepot.recover(this);android.webkit.CookieManager.getInstance();}catch(Exception ignored){}try{font=Typeface.createFromAsset(getAssets(),"fonts/MedeoSans-Medium.ttf");}catch(Exception ignored){}getWindow().setStatusBarColor(Color.BLACK);getWindow().setNavigationBarColor(Color.BLACK);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);root=new FrameLayout(this);root.setBackgroundColor(Color.BLACK);video=new VideoView(this);FrameLayout.LayoutParams vp=new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER);root.addView(video,vp);poster=new ImageView(this);poster.setScaleType(ImageView.ScaleType.FIT_CENTER);root.addView(poster,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));setContentView(root);audio=(AudioManager)getSystemService(AUDIO_SERVICE);audioRequest=new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN).setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MOVIE).build()).setOnAudioFocusChangeListener(change->{if(isFinishing()||isDestroyed())return;if(change==AudioManager.AUDIOFOCUS_LOSS||change==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT){focusResume=video.isPlaying();video.pause();getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);}else if(change==AudioManager.AUDIOFOCUS_GAIN){if(ready&&media!=null)media.setVolume(muted?0:1,muted?0:1);if(focusResume&&resumed){focusResume=false;startPlayback();}}else if(change==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK&&media!=null)media.setVolume(muted?0:.2f,muted?0:.2f);}).build();
+ video.setOnPreparedListener(player->{if(isFinishing()||isDestroyed())return;media=player;ready=true;loader.setVisibility(View.GONE);video.setOnInfoListener((mp,what,extra)->{if(what==MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START){poster.animate().alpha(0).setDuration(140).withEndAction(()->{poster.setVisibility(View.GONE);poster.setImageDrawable(null);}).start();}return false;});video.setAlpha(1);controls.setVisibility(infoOpen?View.GONE:View.VISIBLE);position=PlaybackState.resumeAt(position,video.getDuration(),completed);if(position>0)video.seekTo(position);player.setVolume(muted?0:1,muted?0:1);showChrome();if(resumed&&wantPlay)startPlayback();});video.setOnErrorListener((player,what,extra)->{ready=false;media=null;showError("Не удалось воспроизвести видео. Попробуй открыть его ещё раз.");return true;});video.setOnCompletionListener(player->{completed=true;persistPlayback(true);wantPlay=false;getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);showChrome();});
+ loader=new LinearLayout(this);loader.setOrientation(LinearLayout.VERTICAL);loader.setGravity(Gravity.CENTER);loader.setPadding(dp(32),dp(25),dp(32),dp(25));loader.setBackgroundColor(0x66000000);LinearLayout preparation=new LinearLayout(this);preparation.setOrientation(LinearLayout.VERTICAL);preparation.setPadding(dp(20),dp(18),dp(20),dp(20));preparation.setBackground(new ControlSurface(surfaceLighting,0xff34373d,0xff292d32,0x4dffffff,0x0affffff,38,dp(24),dp(1)));preparation.setClipToOutline(true);preparation.setElevation(dp(4));loader.addView(preparation,new LinearLayout.LayoutParams(-1,-2));status=text("Подготавливаю видео",19,0xfff2f4ef);amount=text("",12,0xff9ca99d);progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setIndeterminate(true);progress.setProgressTintList(android.content.res.ColorStateList.valueOf(0xffc1d1bc));progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xffc1d1bc));retry=pill("Повторить загрузку");retry.setVisibility(View.GONE);retry.setOnClickListener(v->{wantPlay=true;load();});preparation.addView(status,new LinearLayout.LayoutParams(-1,dp(45)));LinearLayout.LayoutParams bar=new LinearLayout.LayoutParams(-1,dp(5));bar.setMargins(dp(20),dp(20),dp(20),dp(12));preparation.addView(progress,bar);preparation.addView(amount,new LinearLayout.LayoutParams(-1,-2));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-2,dp(48));rp.topMargin=dp(18);preparation.addView(retry,rp);TextView hint=text("Свайп вниз — информация",10,0xffadb6ad);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=dp(16);preparation.addView(hint,hp);root.addView(loader,new FrameLayout.LayoutParams(-1,-1));
+ back=new PlayerGlyphButton(this,"back","Назад",font);FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT);bp.setMargins(dp(12),dp(16),0,0);root.addView(back,bp);back.setOnClickListener(v->{if(infoOpen)closeInfo();else finish();});
+ more=new PlayerGlyphButton(this,"more","Дополнительные действия",font);FrameLayout.LayoutParams mp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.RIGHT);mp.setMargins(0,dp(16),dp(12),0);root.addView(more,mp);more.setOnClickListener(v->options());
+ buildControls();video.setOnTouchListener((v,event)->handleVideoTouch(event));id=getIntent().getStringExtra("id");file=getIntent().getStringExtra("file");if(id!=null)try{JSONObject saved=Store.shared(this).find(id);if(java.util.regex.Pattern.compile("(?iu)ингредиент|ingredients|recipe|рецепт").matcher(saved.optString("description")).find())information.setText(Lang.text(this,"Рецепт и описание")+"  ↑");completed=saved.optBoolean("watchCompleted");position=PlaybackState.resumeAt(saved.optLong("watchPosition"),saved.optLong("watchDuration"),completed);File cover=new File(new File(getFilesDir(),"thumbs"),id+".jpg");if(cover.isFile()){android.graphics.Bitmap bitmap=android.graphics.BitmapFactory.decodeFile(cover.getPath());if(bitmap!=null)poster.setImageBitmap(bitmap);}}catch(Exception ignored){}if(state!=null){position=state.getInt("position",0);muted=state.getBoolean("muted",false);wantPlay=state.getBoolean("wantPlay",true);completed=state.getBoolean("completed",completed);}mute.icon(muted?"muted":"sound",muted?"Включить звук":"Выключить звук");load();handler.post(tick);}
+ String clock(int millis){int seconds=Math.max(0,millis)/1000;return seconds>=3600?String.format(java.util.Locale.ROOT,"%d:%02d:%02d",seconds/3600,(seconds/60)%60,seconds%60):String.format(java.util.Locale.ROOT,"%d:%02d",seconds/60,seconds%60);}
+ void updateTimes(int current,int duration){String elapsed=clock(current),total=duration>0?clock(duration):"—:—";time.setText(elapsed);durationTime.setText(total);time.setContentDescription(Lang.text(this,"Прошло")+" "+elapsed);durationTime.setContentDescription(Lang.text(this,"Длительность")+" "+total);}
+ void buildControls(){
+ controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);controls.setPadding(dp(22),dp(16),dp(22),dp(10));controls.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0x18000000,0x70000000}));FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);root.addView(controls,cp);controls.setVisibility(View.GONE);
+ LinearLayout timeline=new LinearLayout(this);timeline.setOrientation(LinearLayout.HORIZONTAL);timeline.setPadding(dp(12),0,dp(12),0);timeline.setGravity(Gravity.CENTER_VERTICAL);
+ time=text("0:00",11,0xfff0f4ed);durationTime=text("—:—",11,0xfff0f4ed);
+ for(TextView label:new TextView[]{time,durationTime}){label.setSingleLine(false);label.setMaxLines(1);label.setHorizontallyScrolling(false);label.setEllipsize(null);label.setIncludeFontPadding(false);label.setFontFeatureSettings("tnum");label.setShadowLayer(dp(2),0,dp(1),0xee000000);timeline.addView(label,new LinearLayout.LayoutParams(0,-2,1));}
+ time.setGravity(Gravity.LEFT|Gravity.CENTER_VERTICAL);durationTime.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);timeline.setMinimumHeight(dp(22));controls.addView(timeline,new LinearLayout.LayoutParams(-1,-2));updateTimes(0,0);
+ seek=new SeekBar(this);seek.setMax(1000);seek.setPadding(dp(12),0,dp(12),0);seek.setProgressTintList(android.content.res.ColorStateList.valueOf(0xffe6eee2));seek.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0x50ffffff));GradientDrawable thumb=new GradientDrawable();thumb.setShape(GradientDrawable.OVAL);thumb.setColor(0xfff5f8f1);thumb.setSize(dp(8),dp(8));seek.setThumb(thumb);seek.setThumbOffset(dp(4));controls.addView(seek,new LinearLayout.LayoutParams(-1,dp(32)));
+ rail=new PlayerGlassRail(this);rail.setPadding(dp(8),0,dp(8),0);controls.addView(rail,new LinearLayout.LayoutParams(-1,dp(54)));
+ rail.addView(new View(this),new LinearLayout.LayoutParams(dp(55),1));rail.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
+ PlayerGlyphButton rewind=new PlayerGlyphButton(this,"rewind","Назад на 10 секунд",font);rail.addView(rewind,new LinearLayout.LayoutParams(dp(48),dp(48)));rewind.setOnClickListener(v->{if(ready)video.seekTo(Math.max(0,video.getCurrentPosition()-10000));showChrome();});
+ toggle=new PlayerGlyphButton(this,"pause","Пауза",font);rail.addView(toggle,new LinearLayout.LayoutParams(dp(48),dp(48)));toggle.setOnClickListener(v->{if(!ready)return;if(video.isPlaying()){wantPlay=false;video.pause();persistPlayback(false);toggle.icon("play","Смотреть");}else startPlayback();showChrome();});
+ PlayerGlyphButton forward=new PlayerGlyphButton(this,"forward","Вперёд на 10 секунд",font);rail.addView(forward,new LinearLayout.LayoutParams(dp(48),dp(48)));forward.setOnClickListener(v->{if(ready)video.seekTo(Math.min(video.getDuration(),video.getCurrentPosition()+10000));showChrome();});
+ rail.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));View divider=new View(this);divider.setBackgroundColor(0x22ffffff);LinearLayout.LayoutParams line=new LinearLayout.LayoutParams(dp(1),dp(14));line.leftMargin=dp(3);line.rightMargin=dp(3);rail.addView(divider,line);
+ mute=new PlayerGlyphButton(this,"sound","Выключить звук",font);rail.addView(mute,new LinearLayout.LayoutParams(dp(48),dp(48)));mute.setOnClickListener(v->{muted=!muted;mute.icon(muted?"muted":"sound",muted?"Включить звук":"Выключить звук");if(ready&&media!=null)media.setVolume(muted?0:1,muted?0:1);showChrome();});
+ Button details=new Button(this);information=details;details.setAllCaps(false);details.setText(Lang.text(this,"Описание и заметки")+"  ↑");details.setTypeface(font);details.setTextSize(11);details.setTextColor(0xffe9eee5);details.setShadowLayer(dp(2),0,dp(1),0x80000000);details.setBackgroundColor(Color.TRANSPARENT);details.setMinHeight(dp(48));controls.addView(details,new LinearLayout.LayoutParams(-1,dp(48)));details.setOnClickListener(v->openInfo());
+ seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar s){scrubbing=true;handler.removeCallbacks(hideChrome);}public void onProgressChanged(SeekBar s,int value,boolean fromUser){if(fromUser&&ready)updateTimes((int)(video.getDuration()*value/1000L),video.getDuration());}public void onStopTrackingTouch(SeekBar s){scrubbing=false;if(ready){completed=false;video.seekTo((int)(video.getDuration()*s.getProgress()/1000L));}showChrome();}});
+ root.setOnApplyWindowInsetsListener((view,insets)->{int top=insets.getSystemWindowInsetTop(),bottom=insets.getSystemWindowInsetBottom();if(Build.VERSION.SDK_INT>=28&&insets.getDisplayCutout()!=null){top=Math.max(top,insets.getDisplayCutout().getSafeInsetTop());bottom=Math.max(bottom,insets.getDisplayCutout().getSafeInsetBottom());}FrameLayout.LayoutParams bp=(FrameLayout.LayoutParams)back.getLayoutParams(),mp=(FrameLayout.LayoutParams)more.getLayoutParams();bp.topMargin=dp(12)+top;mp.topMargin=dp(12)+top;back.setLayoutParams(bp);more.setLayoutParams(mp);controls.setPadding(dp(22),dp(16),dp(22),dp(10)+bottom);return insets;});root.requestApplyInsets();
+ }
+ void showChrome(){if(infoOpen)return;if(surfaceLighting!=null&&resumed)surfaceLighting.start();for(View view:new View[]{back,more,controls})if(view!=null)view.animate().cancel();back.setVisibility(View.VISIBLE);more.setVisibility(id!=null?View.VISIBLE:View.GONE);back.setAlpha(1);more.setAlpha(1);if(ready){controls.setVisibility(View.VISIBLE);controls.setAlpha(1);if(resumed)rail.start(video);}handler.removeCallbacks(hideChrome);if(ready&&video.isPlaying())handler.postDelayed(hideChrome,2200);}
+ final Runnable hideChrome=()->{if(infoOpen||!ready||!video.isPlaying()||scrubbing)return;for(View view:new View[]{back,more,controls})view.animate().alpha(0).setDuration(180).withEndAction(()->{view.setVisibility(View.INVISIBLE);if(view==controls){surfaceLighting.stop();rail.stop();}}).start();};
+ void load(){rail.stop();ready=false;controls.setVisibility(View.GONE);showChrome();retry.setVisibility(View.GONE);loader.setVisibility(View.VISIBLE);progress.setVisibility(View.VISIBLE);progress.setIndeterminate(true);status.setText(Lang.text(PlayerActivity.this,"Подготавливаю видео"));amount.setText(Lang.text(PlayerActivity.this,"После загрузки воспроизведение начнётся автоматически"));if(id==null){if(file!=null&&file.matches("[a-f0-9-]{36}\\.mp4")&&new File(getFilesDir(),file).isFile())openFile(file);else showError("Видео не найдено");return;}MediaDepot.download(this,id,true).whenComplete((name,error)->runOnUiThread(()->{if(isFinishing()||isDestroyed())return;if(error!=null)showError(Failures.message(error));else openFile(name);}));}
+ void openFile(String name){if(name==null||!name.matches("[a-f0-9-]{36}\\.mp4")){showError("Файл видео не найден");return;}file=name;status.setText(Lang.text(PlayerActivity.this,"Открываю видео"));progress.setIndeterminate(true);video.setVideoURI(Uri.fromFile(new File(getFilesDir(),name)));}
+ void startPlayback(){if(!ready||!resumed||infoOpen)return;if(audio.requestAudioFocus(audioRequest)==AudioManager.AUDIOFOCUS_REQUEST_GRANTED){if(completed){completed=false;position=0;video.seekTo(0);}wantPlay=true;video.start();getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);showChrome();}}
+ void showError(String message){ready=false;rail.stop();loader.setVisibility(View.VISIBLE);status.setText(Lang.text(PlayerActivity.this,message));amount.setText(Lang.text(PlayerActivity.this,"Можно повторить загрузку или вернуться в библиотеку"));progress.setVisibility(View.GONE);retry.setVisibility(View.VISIBLE);if(controls!=null)controls.setVisibility(View.GONE);back.setVisibility(View.VISIBLE);back.setAlpha(1);}
+ final Runnable tick=new Runnable(){public void run(){if(isFinishing()||isDestroyed())return;if(ready){int current=video.getCurrentPosition(),duration=video.getDuration();if(video.isPlaying()&&android.os.SystemClock.elapsedRealtime()-lastSaved>5000)persistPlayback(false);if(!scrubbing){if(duration>0)seek.setProgress((int)(current*1000L/duration));updateTimes(current,duration);}toggle.icon(video.isPlaying()?"pause":"play",video.isPlaying()?"Пауза":"Смотреть");if(video.isPlaying())getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);}if(!ready&&id!=null){DownloadQueue.Job job=MediaDepot.downloads.find(id);if(job!=null){status.setText(Lang.text(PlayerActivity.this,job.stage.equals("downloading")?"Скачиваю видео":job.stage.equals("queued")?"Видео в очереди":"Подготавливаю видео"));if(job.total>0){progress.setIndeterminate(false);progress.setMax(1000);progress.setProgress((int)Math.min(1000,job.bytes*1000/job.total));amount.setText(Lang.text(PlayerActivity.this,String.format(java.util.Locale.ROOT,"%.1f / %.1f МБ",job.bytes/1048576.0,job.total/1048576.0)));}}}handler.postDelayed(this,350);}};
+ boolean handleVideoTouch(android.view.MotionEvent event){int action=event.getActionMasked();if(action==android.view.MotionEvent.ACTION_DOWN){swipeX=event.getRawX();swipeY=event.getRawY();swipeTime=event.getEventTime();swipeArmed=event.getPointerCount()==1;int[] location=new int[2];if(controls.getVisibility()==View.VISIBLE){controls.getLocationOnScreen(location);if(swipeY>=location[1])swipeArmed=false;}showChrome();return true;}if(event.getPointerCount()>1)swipeArmed=false;float dx=(event.getRawX()-swipeX)/getResources().getDisplayMetrics().density,dy=(event.getRawY()-swipeY)/getResources().getDisplayMetrics().density;if(action==android.view.MotionEvent.ACTION_MOVE&&swipeArmed&&DismissSwipe.vertical(dx,dy)){handler.removeCallbacks(hideChrome);return true;}if(action==android.view.MotionEvent.ACTION_UP||action==android.view.MotionEvent.ACTION_CANCEL){float velocity=dy*1000f/Math.max(1,event.getEventTime()-swipeTime);boolean close=action==android.view.MotionEvent.ACTION_UP&&swipeArmed&&DismissSwipe.finish(dx,dy,velocity,root.getHeight()/getResources().getDisplayMetrics().density);swipeArmed=false;if(close){openInfo();}else{root.animate().translationY(0).setDuration(140).start();showChrome();}return true;}return true;}
+ void openInfo(){if(infoOpen||id==null)return;rail.stop();infoOpen=true;handler.removeCallbacks(hideChrome);if(ready)video.pause();getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);for(View v:new View[]{more,controls}){v.animate().cancel();v.setVisibility(View.GONE);}back.animate().cancel();back.setVisibility(View.VISIBLE);back.setAlpha(1);int height=root.getHeight(),preview=Math.max(dp(100),(int)(height*.38f));previewLabel=text(Lang.text(this,"На паузе")+" · "+clock(ready?video.getCurrentPosition():position),10,0xffedf1eb);previewLabel.setPadding(dp(10),dp(5),dp(10),dp(5));GradientDrawable badge=new GradientDrawable();badge.setColor(0x80000000);badge.setCornerRadius(dp(13));previewLabel.setBackground(badge);FrameLayout.LayoutParams badgeParams=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.LEFT);badgeParams.leftMargin=dp(22);badgeParams.topMargin=Math.max(dp(72),preview-dp(34));root.addView(previewLabel,badgeParams);infoPanel=new PlayerInfo(this,id,()->closeInfo());FrameLayout.LayoutParams ip=new FrameLayout.LayoutParams(-1,height-preview,Gravity.BOTTOM);root.addView(infoPanel,ip);infoPanel.setTranslationY(dp(20));infoPanel.setAlpha(0);infoPanel.animate().translationY(0).alpha(1).setDuration(180).start();}
+ void closeInfo(){if(!infoOpen)return;infoOpen=false;if(previewLabel!=null){root.removeView(previewLabel);previewLabel=null;}if(infoPanel!=null){root.removeView(infoPanel);infoPanel.dispose();infoPanel=null;}showChrome();if(ready&&wantPlay&&resumed)startPlayback();}
+ @Override public void onBackPressed(){if(infoOpen)closeInfo();else super.onBackPressed();}
+ void persistPlayback(boolean finished){if(id==null||!ready||history.isShutdown())return;int pos=video.getCurrentPosition(),duration=video.getDuration();if(duration<=0)return;lastSaved=android.os.SystemClock.elapsedRealtime();String savedId=id;long now=System.currentTimeMillis();android.content.Context context=getApplicationContext();history.execute(()->{try{Store.shared(context).playback(savedId,pos,duration,finished,now);}catch(Exception ignored){}});}
+ protected void onResume(){super.onResume();resumed=true;surfaceLighting.start();handler.removeCallbacks(tick);handler.post(tick);if(ready&&wantPlay&&!infoOpen)startPlayback();}protected void onPause(){resumed=false;rail.stop();surfaceLighting.stop();handler.removeCallbacks(tick);handler.removeCallbacks(hideChrome);if(ready){position=video.getCurrentPosition();if(!infoOpen)wantPlay=video.isPlaying();persistPlayback(completed);video.pause();}audio.abandonAudioFocusRequest(audioRequest);getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);super.onPause();}protected void onSaveInstanceState(Bundle state){state.putBoolean("completed",completed);state.putInt("position",ready?video.getCurrentPosition():position);state.putBoolean("muted",muted);state.putBoolean("wantPlay",resumed&&ready?video.isPlaying():wantPlay);super.onSaveInstanceState(state);}protected void onDestroy(){if(rail!=null)rail.dispose();if(infoPanel!=null)infoPanel.dispose();handler.removeCallbacksAndMessages(null);surfaceLighting.stop();history.shutdown();ready=false;media=null;video.stopPlayback();audio.abandonAudioFocusRequest(audioRequest);super.onDestroy();}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/PlayerGlassRail.java
+========================================================================
+package com.reelkeep.app;
+
+import android.content.Context;
+import android.graphics.*;
+import android.os.Handler;
+import android.view.PixelCopy;
+import android.view.SurfaceView;
+import android.widget.LinearLayout;
+
+/** Small backdrop samples only while the rail is visible. Works with VideoView's SurfaceView on API 26+. */
+final class PlayerGlassRail extends LinearLayout {
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    private final RectF bounds = new RectF(), sampleBounds = new RectF();
+    private final Path clip = new Path();
+    private final Handler handler = new Handler();
+    private SurfaceView source;
+    private Bitmap sample;
+    private boolean running, copying, disposed;
+    private int generation;
+
+    PlayerGlassRail(Context context) {
+        super(context);
+        setOrientation(HORIZONTAL);
+        setGravity(android.view.Gravity.CENTER_VERTICAL);
+        setWillNotDraw(false);
+        setElevation(0);
+    }
+
+    void start(SurfaceView video) {
+        source = video;
+        if (running || disposed) return;
+        running = true;
+        handler.post(capture);
+    }
+
+    void stop() { running = false; generation++; handler.removeCallbacks(capture); }
+    void dispose() { stop(); disposed = true; sample = null; source = null; }
+
+    private final Runnable capture = new Runnable() {
+        @Override public void run() {
+            if (!running || disposed) return;
+            handler.postDelayed(this, 180);
+            if (copying || source == null || getWidth() <= 0 || getHeight() <= 0
+                    || !source.getHolder().getSurface().isValid()) return;
+            int[] rail = new int[2], video = new int[2];
+            getLocationOnScreen(rail); source.getLocationOnScreen(video);
+            Rect intersect = new Rect(rail[0], rail[1], rail[0] + getWidth(), rail[1] + getHeight());
+            if (!intersect.intersect(video[0], video[1], video[0] + source.getWidth(), video[1] + source.getHeight())) {
+                if (sample != null) { sample = null; invalidate(); }
+                return;
+            }
+            Rect surface = source.getHolder().getSurfaceFrame();
+            float sx = surface.width() / (float) Math.max(1, source.getWidth());
+            float sy = surface.height() / (float) Math.max(1, source.getHeight());
+            Rect rect = new Rect(Math.max(0, Math.round((intersect.left - video[0]) * sx)),
+                    Math.max(0, Math.round((intersect.top - video[1]) * sy)),
+                    Math.min(surface.width(), Math.round((intersect.right - video[0]) * sx)),
+                    Math.min(surface.height(), Math.round((intersect.bottom - video[1]) * sy)));
+            if (rect.width() <= 0 || rect.height() <= 0) return;
+            float factor = 112f / Math.max(1, getWidth());
+            Bitmap next = Bitmap.createBitmap(Math.max(1, Math.round(intersect.width() * factor)),
+                    Math.max(1, Math.round(intersect.height() * factor)), Bitmap.Config.ARGB_8888);
+            RectF destination = new RectF(intersect.left - rail[0], intersect.top - rail[1],
+                    intersect.right - rail[0], intersect.bottom - rail[1]);
+            final int token = generation;
+            copying = true;
+            try {
+                PixelCopy.request(source, rect, next, result -> {
+                    copying = false;
+                    if (disposed || !running || token != generation) { next.recycle(); return; }
+                    if (result == PixelCopy.SUCCESS) {
+                        blur(next);
+                        sample = next;
+                        sampleBounds.set(destination);
+                        invalidate();
+                    } else next.recycle();
+                }, handler);
+            } catch (RuntimeException unavailable) { copying = false; next.recycle(); }
+        }
+    };
+
+    private static void blur(Bitmap bitmap) {
+        int w = bitmap.getWidth(), h = bitmap.getHeight();
+        int[] pixels = new int[w * h], temp = new int[w * h];
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h);
+        // Tiny downsample + two separable box passes; no full-frame snapshots or shader dependency.
+        final int radius = 3, size = radius * 2 + 1;
+        for (int pass = 0; pass < 2; pass++) {
+            for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
+                int r = 0, g = 0, b = 0;
+                for (int k = -radius; k <= radius; k++) {
+                    int c = pixels[y * w + Math.max(0, Math.min(w - 1, x + k))];
+                    r += (c >> 16) & 255; g += (c >> 8) & 255; b += c & 255;
+                }
+                temp[y * w + x] = 0xff000000 | ((r / size) << 16) | ((g / size) << 8) | b / size;
+            }
+            for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
+                int r = 0, g = 0, b = 0;
+                for (int k = -radius; k <= radius; k++) {
+                    int c = temp[Math.max(0, Math.min(h - 1, y + k)) * w + x];
+                    r += (c >> 16) & 255; g += (c >> 8) & 255; b += c & 255;
+                }
+                pixels[y * w + x] = 0xff000000 | ((r / size) << 16) | ((g / size) << 8) | b / size;
+            }
+        }
+        bitmap.setPixels(pixels, 0, w, 0, 0, w, h);
+    }
+
+    @Override protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        float d = getResources().getDisplayMetrics().density, radius = getHeight() / 2f;
+        bounds.set(.6f * d, .6f * d, getWidth() - .6f * d, getHeight() - .6f * d);
+        clip.reset(); clip.addRoundRect(bounds, radius, radius, Path.Direction.CW);
+        canvas.save(); canvas.clipPath(clip);
+        paint.setStyle(Paint.Style.FILL); paint.setShader(null); paint.setColor(0xff111a15);
+        canvas.drawRect(bounds, paint);
+        if (sample != null) { paint.setAlpha(255); canvas.drawBitmap(sample, null, sampleBounds, paint); }
+        paint.setShader(new LinearGradient(0, 0, getWidth() * .65f, getHeight(),
+                0x8c24332b, 0xb3121b16, Shader.TileMode.CLAMP));
+        canvas.drawRect(bounds, paint);
+        paint.setShader(new LinearGradient(0, 0, 0, getHeight(), 0x1affffff, 0x02ffffff, Shader.TileMode.CLAMP));
+        canvas.drawRect(bounds, paint);
+        canvas.restore();
+        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(.8f * d);
+        paint.setShader(new LinearGradient(0, 0, 0, getHeight(), 0x45ffffff, 0x14ffffff, Shader.TileMode.CLAMP));
+        canvas.drawRoundRect(bounds, radius, radius, paint);
+        paint.setStrokeWidth(.7f * d);
+        paint.setShader(new LinearGradient(20 * d, 0, getWidth() - 20 * d, 0,
+                new int[]{0x00ffffff, 0x90ffffff, 0x20ffffff, 0x00ffffff},
+                new float[]{0, .28f, .72f, 1}, Shader.TileMode.CLAMP));
+        canvas.drawLine(radius, d, getWidth() - radius, d, paint);
+        paint.setShader(null);
+    }
+
+    @Override protected void dispatchDraw(Canvas canvas) {
+        int saved = canvas.save();
+        canvas.clipPath(clip);
+        super.dispatchDraw(canvas);
+        canvas.restoreToCount(saved);
+    }
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/PlayerGlyphButton.java
+========================================================================
+package com.reelkeep.app;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.content.res.ColorStateList;
+import android.view.View;
+import android.view.accessibility.AccessibilityNodeInfo;
+
+/** A real button View: glyphs never depend on TextView's scrolling, tint or font. */
+final class PlayerGlyphButton extends View {
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Path path = new Path();
+    private final Typeface font;
+    private String kind;
+    private int ink = 0xfff4f6f1;
+
+    PlayerGlyphButton(Context context, String kind, String label, Typeface font) {
+        super(context);
+        this.font = font;
+        setClickable(true);
+        setFocusable(true);
+        setMinimumWidth(dp(48));
+        setMinimumHeight(dp(48));
+        setBackground(new RippleDrawable(ColorStateList.valueOf(0x22ffffff),
+                new ColorDrawable(Color.TRANSPARENT), null));
+        icon(kind, label);
+    }
+
+    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+
+    void ink(int color) { ink = color; invalidate(); }
+
+    void icon(String next, String label) {
+        boolean changed = !next.equals(kind);
+        kind = next;
+        String accessible = Lang.text(getContext(), label);
+        if (!accessible.contentEquals(getContentDescription() == null ? "" : getContentDescription())) {
+            setContentDescription(accessible);
+            setTooltipText(accessible);
+        }
+        if (changed) invalidate();
+    }
+
+    @Override protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        final float density = getResources().getDisplayMetrics().density;
+        canvas.save();
+        canvas.translate(getWidth() / 2f, getHeight() / 2f);
+        canvas.scale(density, density);
+        paint.reset();
+        paint.setAntiAlias(true);
+        if (kind.equals("pause") || kind.equals("play")) {
+            paint.setShader(new android.graphics.LinearGradient(-12, -16, 12, 16,
+                    0x35ffffff, 0x0affffff, android.graphics.Shader.TileMode.CLAMP));
+            canvas.drawCircle(0, 0, 16, paint);
+            paint.setShader(null);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(.6f);
+            paint.setColor(0x35ffffff);
+            canvas.drawArc(-15.7f, -15.7f, 15.7f, 15.7f, 205, 125, false, paint);
+        }
+        paint.setShader(null);
+        paint.setColor(ink);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(1.7f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setShadowLayer(1.4f, 0, .7f, 0x80000000);
+        path.reset();
+        if (kind.equals("back")) {
+            path.moveTo(3, -7); path.lineTo(-4, 0); path.lineTo(3, 7);
+        } else if (kind.equals("down")) {
+            path.moveTo(-5, -2.5f); path.lineTo(0, 2.5f); path.lineTo(5, -2.5f);
+        } else if (kind.equals("more")) {
+            paint.setStyle(Paint.Style.FILL);
+            for (int x = -6; x <= 6; x += 6) canvas.drawCircle(x, 0, 1.3f, paint);
+        } else if (kind.equals("pause")) {
+            paint.setStrokeWidth(2.6f);
+            canvas.drawLine(-3.5f, -5.5f, -3.5f, 5.5f, paint);
+            canvas.drawLine(3.5f, -5.5f, 3.5f, 5.5f, paint);
+        } else if (kind.equals("play")) {
+            paint.setStyle(Paint.Style.FILL);
+            path.moveTo(-3.5f, -6.5f); path.lineTo(6, 0); path.lineTo(-3.5f, 6.5f); path.close();
+        } else if (kind.equals("rewind") || kind.equals("forward")) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTypeface(font == null ? Typeface.create("sans-serif-medium", 0) : font);
+            paint.setTextSize(10.5f);
+            paint.setTextAlign(Paint.Align.CENTER);
+            Paint.FontMetrics metrics = paint.getFontMetrics();
+            canvas.drawText(kind.equals("rewind") ? "−10" : "+10", 0,
+                    -(metrics.ascent + metrics.descent) / 2, paint);
+        } else {
+            path.moveTo(-8, -3); path.lineTo(-4, -3); path.lineTo(1, -7);
+            path.lineTo(1, 7); path.lineTo(-4, 3); path.lineTo(-8, 3); path.close();
+            if (kind.equals("muted")) {
+                canvas.drawLine(5, -3, 10, 3, paint);
+                canvas.drawLine(10, -3, 5, 3, paint);
+            } else {
+                canvas.drawArc(-3, -7, 10, 7, -55, 110, false, paint);
+            }
+        }
+        canvas.drawPath(path, paint);
+        canvas.restore();
+    }
+
+    @Override public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+        super.onInitializeAccessibilityNodeInfo(info);
+        info.setClassName("android.widget.Button");
+    }
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/PlayerInfo.java
+========================================================================
+package com.reelkeep.app;
+
+import android.content.res.Configuration;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.view.*;
+import android.webkit.*;
+import android.widget.*;
+import org.json.*;
+
+/** Local information sheet, visually paired with the B.2 playback rail. */
+final class PlayerInfo extends LinearLayout {
+    final WebView web;
+    PlayerInfo(PlayerActivity activity, String id, Runnable close) {
+        super(activity);
+        setOrientation(VERTICAL);
+        String language = activity.getSharedPreferences("preferences", 0).getString("language", "en");
+        String theme = activity.getSharedPreferences("preferences", 0).getString("theme", "graphite");
+        boolean dark = theme.equals("graphite") || (theme.equals("system") &&
+                (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
+        int ink = dark ? 0xffedf1eb : 0xff27332c;
+        GradientDrawable surface = new GradientDrawable();
+        surface.setColor(dark ? 0xff222a27 : 0xfff8faf6);
+        float radius = activity.dp(28);
+        surface.setCornerRadii(new float[]{radius, radius, radius, radius, 0, 0, 0, 0});
+        setBackground(surface); setClipToOutline(true); setElevation(activity.dp(6));
+
+        FrameLayout handleArea = new FrameLayout(activity);
+        View handle = new View(activity);
+        GradientDrawable gripShape = new GradientDrawable();
+        gripShape.setColor(dark ? 0xff899c8f : 0xffa5b1a7);
+        gripShape.setCornerRadius(activity.dp(3)); handle.setBackground(gripShape);
+        handleArea.addView(handle, new FrameLayout.LayoutParams(activity.dp(32), activity.dp(4), Gravity.CENTER));
+        addView(handleArea, new LinearLayout.LayoutParams(-1, activity.dp(22)));
+
+        LinearLayout header = new LinearLayout(activity); header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(activity.dp(23), 0, activity.dp(10), 0);
+        TextView label = activity.text(language.equals("ru") ? "О ВИДЕО" : "ABOUT VIDEO", 9,
+                dark ? 0xffb1bdb4 : 0xff69796d);
+        label.setLetterSpacing(.12f); label.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        header.addView(label, new LinearLayout.LayoutParams(0, activity.dp(48), 1));
+        PlayerGlyphButton more = new PlayerGlyphButton(activity, "more", "Дополнительные действия", activity.font);
+        more.ink(ink); header.addView(more, new LinearLayout.LayoutParams(activity.dp(48), activity.dp(48)));
+        more.setOnClickListener(v -> activity.options());
+        PlayerGlyphButton done = new PlayerGlyphButton(activity, "down", "Свернуть информацию", activity.font);
+        done.ink(ink); header.addView(done, new LinearLayout.LayoutParams(activity.dp(48), activity.dp(48)));
+        done.setOnClickListener(v -> close.run());
+        final float[] drag = new float[2];
+        View.OnTouchListener dismiss = (v, event) -> {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                drag[0] = event.getRawY(); drag[1] = event.getRawX(); return true;
+            }
+            if (event.getActionMasked() == MotionEvent.ACTION_UP &&
+                    event.getRawY() - drag[0] > activity.dp(80) &&
+                    Math.abs(event.getRawX() - drag[1]) < event.getRawY() - drag[0]) close.run();
+            return true;
+        };
+        header.setOnTouchListener(dismiss); handleArea.setOnTouchListener(dismiss); addView(header);
+        web = new WebView(activity); web.setBackgroundColor(dark ? 0xff222a27 : 0xfff8faf6);
+        web.getSettings().setJavaScriptEnabled(true);
+        web.getSettings().setAllowFileAccess(false); web.getSettings().setAllowContentAccess(false);
+        web.getSettings().setBlockNetworkLoads(true);
+        web.addJavascriptInterface(new Object() {
+            @JavascriptInterface public boolean copyRecipe(String text) {
+                return RecipeClipboard.copy(activity, text);
+            }
+        }, "PlayerTools");
+        final String selected = dark ? "graphite" : "light";
+        web.setWebViewClient(new WebViewClient() {
+            public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) { return true; }
+            public void onPageFinished(WebView v, String url) {
+                try {
+                    JSONObject item = Store.shared(activity).find(id);
+                    v.evaluateJavascript("showInfo(" + item.toString() + "," + JSONObject.quote(language) + "," + JSONObject.quote(selected) + ")", null);
+                } catch (Exception ignored) {}
+            }
+        });
+        addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
+        web.loadUrl("file:///android_asset/player-info.html");
+    }
+    void dispose() { web.removeJavascriptInterface("PlayerTools"); web.destroy(); }
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/Prepared.java
+========================================================================
+package com.reelkeep.app;
+import org.json.*;import java.net.*;
+public final class Prepared {
+ static final long MAX_AGE=30*60*1000L;
+ static boolean usable(JSONObject item,long now){long timestamp=item.optLong("videoPreparedAt"),age=now-timestamp;if(timestamp<=0||age<0||age>=MAX_AGE)return false;try{return item.optString("downloadEngine").equals("yt-dlp")?PlatformLinks.external(item.optString("videoUrl")):WebMedia.allowed(new URL(item.optString("videoUrl")),true);}catch(Exception e){return false;}}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/RecipeClipboard.java
+========================================================================
+package com.reelkeep.app;
+
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+
+/** Plain text only, invoked by the local, network-blocked information sheet. */
+final class RecipeClipboard {
+    static boolean copy(Context context, String text) {
+        if (text == null || text.trim().isEmpty() || text.length() > 100000) return false;
+        try {
+            ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard == null) return false;
+            clipboard.setPrimaryClip(ClipData.newPlainText("Reelkeep recipe", text));
+            return true;
+        } catch (RuntimeException failure) { return false; }
+    }
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/Semantic.java
+========================================================================
+package com.reelkeep.app;
+import android.content.Context;import ai.onnxruntime.*;import org.json.*;import java.io.*;import java.nio.*;import java.util.*;import java.util.regex.*;
+public final class Semantic{
+ static Semantic instance;OrtEnvironment env;OrtSession session;Map<String,Integer> vocab=new HashMap<>();JSONArray labels;
+ Semantic(Context c)throws Exception{try(BufferedReader r=new BufferedReader(new InputStreamReader(c.getAssets().open("vocab.txt"),"UTF-8"))){String line;int i=0;while((line=r.readLine())!=null)vocab.put(line,i++);}File model=new File(c.getFilesDir(),"semantic-v1.onnx");if(!model.isFile()){File temp=new File(c.getFilesDir(),"semantic-v1.tmp");try(InputStream in=c.getAssets().open("semantic.onnx");OutputStream out=new FileOutputStream(temp)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)out.write(b,0,n);}if(!temp.renameTo(model))throw new IOException("Model copy failed");}env=OrtEnvironment.getEnvironment();OrtSession.SessionOptions options=new OrtSession.SessionOptions();options.setIntraOpNumThreads(2);options.setInterOpNumThreads(1);session=env.createSession(model.getAbsolutePath(),options);options.close();try(InputStream in=c.getAssets().open("semantic-labels.json")){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);labels=new JSONArray(new String(out.toByteArray(),"UTF-8"));}}
+ long[] tokenize(String text){ArrayList<Long> ids=new ArrayList<>();ids.add((long)vocab.get("[CLS]"));Matcher words=Pattern.compile("[\\p{L}\\p{N}]+|_|[^\\p{L}\\p{N}_\\s]").matcher(text);while(words.find()&&ids.size()<190){String w=words.group();ArrayList<Long> pieces=new ArrayList<>();int at=0;if(w.length()>100){pieces.add((long)vocab.get("[UNK]"));}else while(at<w.length()){int end=w.length();Integer found=null;while(end>at){found=vocab.get((at==0?"":"##")+w.substring(at,end));if(found!=null)break;end--;}if(found==null){pieces.clear();pieces.add((long)vocab.get("[UNK]"));break;}pieces.add(found.longValue());at=end;}ids.addAll(pieces);}if(ids.size()>190)ids=new ArrayList<>(ids.subList(0,190));ids.add((long)vocab.get("[SEP]"));long[] result=new long[ids.size()];for(int i=0;i<result.length;i++)result[i]=ids.get(i);return result;}
+ float[] embed(String text)throws Exception{long[] ids=tokenize(text),mask=new long[ids.length],type=new long[ids.length];Arrays.fill(mask,1);long[] shape={1,ids.length};try(OnnxTensor input=OnnxTensor.createTensor(env,LongBuffer.wrap(ids),shape);OnnxTensor attention=OnnxTensor.createTensor(env,LongBuffer.wrap(mask),shape);OnnxTensor tokenType=OnnxTensor.createTensor(env,LongBuffer.wrap(type),shape)){Map<String,OnnxTensor> inputs=new HashMap<>();inputs.put("input_ids",input);inputs.put("attention_mask",attention);inputs.put("token_type_ids",tokenType);try(OrtSession.Result result=session.run(inputs)){float[] vector=((float[][][])result.get(0).getValue())[0][0];double sum=0;for(float v:vector)sum+=v*v;float norm=(float)Math.sqrt(sum);for(int i=0;i<vector.length;i++)vector[i]/=norm;return vector;}}}
+ static double dot(float[] v,JSONArray other)throws Exception{double value=0;for(int i=0;i<v.length;i++)value+=v[i]*other.getDouble(i);return value;}
+ static String domain(String text){String s=Smart.clean(text).toLowerCase(Locale.ROOT);if(Pattern.compile("обледен|ветров.{0,12}стекл|дворник|моторн.{0,8}масл|тормозн|двигател|пылесос.{0,12}для (?:машин|авто)|авто.{0,16}пылесос|car.?wash|car.?care|car.?clean|windshield|car vacuum|car cleaning|car maintenance|automotive|windscreen|(?<![a-z])cars?(?![a-z])|de.?icing").matcher(s).find())return "Авто";if(Pattern.compile("артроз|артрит|мениск|диагноз|остеохондроз|реабилитац").matcher(s).find())return "Здоровье";if(Pattern.compile("recipe|ingredients|cooking|baking|рецепт|ингредиент|запека").matcher(s).find())return "Еда";if(Pattern.compile("workout|fitness|силов.{0,15}трениров|тренировк.{0,20}спин").matcher(s).find())return "Спорт";return "";}
+ static synchronized JSONObject analyze(Context c,String text)throws Exception{text=Smart.stripMetadata(text);JSONObject result=Smart.analyze(text);String domain=domain(text);if(!domain.isEmpty())return result.put("category",domain).put("confidence","high").put("analyzer","topic");long latin=text.codePoints().filter(ch->ch>=65&&ch<=122).count(),cyrillic=text.codePoints().filter(ch->ch>=0x400&&ch<=0x4ff).count();if(latin>cyrillic*2+10)return result.put("category","Без категории").put("confidence","low").put("analyzer","language");String meaningful=Smart.clean(text).toLowerCase(Locale.ROOT).replaceAll("(?iu)(?<![\\p{L}])(это|видео|ролик|полезн[а-я]*|сохран[а-я]*|обязательн[а-я]*|посмотр[а-я]*|смотр[а-я]*|интересн[а-я]*|очень|вам|тебе|для|просто|самое|лучшее|подпис[а-я]*|reels|instagram)(?![\\p{L}])","").trim();if(meaningful.replaceAll("[^\\p{L}]","").length()<12)return result.put("category","Без категории").put("confidence","low");if(instance==null)instance=new Semantic(c);float[] v=instance.embed(text);double best=-1,second=-1;JSONObject selected=null;for(int i=0;i<instance.labels.length();i++){JSONObject row=instance.labels.getJSONObject(i);double score=dot(v,row.getJSONArray("vector"));String categoryName=row.getString("category"),lower=text.toLowerCase(Locale.ROOT);if(categoryName.equals("Красота и уход")&&Pattern.compile("волос|косметик|сыворотк|уход за кож").matcher(lower).find())score+=.09;if(categoryName.equals("Авто")&&Pattern.compile("автомобил|двигател|тормозн|моторное масло|масляный фильтр|(?:замен|помен).{0,40}(?:масл|фильтр)").matcher(lower).find())score+=.14;if(categoryName.equals("Спорт")&&Pattern.compile("трениров|упражнен|присед|лопатк|подхода").matcher(lower).find())score+=.05;if(categoryName.equals("Еда")&&Pattern.compile("запека|ингредиент|готовим|творог").matcher(lower).find())score+=.05;if(score>best){second=best;best=score;selected=row;}else if(score>second)second=score;}if(selected!=null&&best>=.52&&best-second>=.025){String category=selected.getString("category");String confidence=best>=.55&&best-second>=.035?"high":"medium";String tags=result.optString("tags");JSONArray candidates=selected.getJSONArray("tags");double tagScore=-1;String tag="";for(int i=0;i<candidates.length();i++){JSONObject t=candidates.getJSONObject(i);double score=dot(v,t.getJSONArray("vector"));if(score>tagScore){tagScore=score;tag=t.getString("tag");}}if(tagScore>.6&&!tags.contains(tag))tags=tags.isEmpty()?tag:tags+", "+tag;result.put("category",category).put("confidence",confidence).put("tags",tags).put("analyzer","semantic");}else result.put("category","Без категории").put("confidence","low").put("analyzer","semantic");return result;}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/Smart.java
+========================================================================
+package com.reelkeep.app;
+import org.json.*;import java.util.*;import java.util.regex.*;
+public final class Smart {
+ static final String[][] RULES={{"Авто","автомобил","машин","двигател","тормоз","шины","водител"},{"Еда","рецепт","готовим","готовить","салат","паста","завтрак","ужин","выпечк","recipe","cooking","ингредиент"},{"Спорт","трениров","упражнен","фитнес","присед","растяжк","workout","fitness"},{"Путешествия","путешеств","отпуск","маршрут","достопримечательн","travel","поездк","туризм"},{"Юмор","юмор","смешн","мем","прикол","comedy","funny"},{"Идеи","дизайн","интерьер","своими руками","лайфхак","вдохнов","идея","идеи","diy","ремонт"}};
+ static String decode(String s){s=s.replace("&quot;","\"").replace("&#039;","'").replace("&apos;","'").replace("&lt;","<").replace("&gt;",">").replace("&nbsp;"," ").replace("&amp;","&");Matcher m=Pattern.compile("&#(x[0-9a-fA-F]+|[0-9]+);").matcher(s);StringBuffer out=new StringBuffer();while(m.find()){String replacement=m.group();try{String code=m.group(1);int point=code.startsWith("x")?Integer.parseInt(code.substring(1),16):Integer.parseInt(code);if(Character.isValidCodePoint(point))replacement=new String(Character.toChars(point));}catch(Exception ignored){}m.appendReplacement(out,Matcher.quoteReplacement(replacement));}m.appendTail(out);return out.toString();}
+ static Map<String,String> meta(String html){Map<String,String> values=new HashMap<>();Matcher tags=Pattern.compile("<meta\\b[^>]*>",Pattern.CASE_INSENSITIVE).matcher(html);while(tags.find()){Matcher attrs=Pattern.compile("([a-zA-Z_:][-a-zA-Z_:.]*)\\s*=\\s*([\"'])(.*?)\\2",Pattern.DOTALL).matcher(tags.group());Map<String,String> a=new HashMap<>();while(attrs.find())a.put(attrs.group(1).toLowerCase(Locale.ROOT),decode(attrs.group(3)));String key=a.containsKey("property")?a.get("property"):a.get("name");if(key!=null&&a.containsKey("content"))values.put(key.toLowerCase(Locale.ROOT),a.get("content"));}return values;}
+ static String clean(String text){return decode(text).replaceAll("https?://\\S+","").replaceAll("\\s+"," ").trim();}
+ static String stripMetadata(String input){String value=decode(input).replace("\\n","\n").trim();String low=value.toLowerCase(Locale.ROOT);boolean counters=Pattern.compile("(?iu)^[\\d\\s.,]+[kmbкм]?\\s*(likes?|views?|отметок|просмотров)").matcher(value).find();if(counters){int colon=value.indexOf(':');if(colon>=0&&colon<450)value=value.substring(colon+1).trim();else value=value.replaceFirst("(?iu)^[\\d\\s.,]+[kmbкм]?\\s*(?:likes?|views?|отметок|просмотров)[^\\n]*?(?:comments?|комментариев)\\s*[-–—]?\\s*","");}else{Matcher by=Pattern.compile("(?iu)^.{1,140}(?: on Instagram| в Instagram)\\s*:\\s*").matcher(value);if(by.find())value=value.substring(by.end()).trim();}while(!value.isEmpty()&&"\"'“”«»".indexOf(value.charAt(0))>=0)value=value.substring(1).trim();value=value.replaceFirst("[\"'“”«»][. ]*$","").trim();return value;}
+ static String caption(Map<String,String> meta){String text=meta.containsKey("og:description")?meta.get("og:description"):meta.get("description");if(text==null)return "";text=stripMetadata(text);String low=text.toLowerCase(Locale.ROOT);if(low.contains("log in")||low.contains("sign up")||low.contains("войдите в instagram")||low.contains("create an account")||low.contains("see photos and videos")||text.length()<10)return "";int quote=text.indexOf(": \"");if(quote>=0)text=text.substring(quote+3).replaceAll("\"[. ]*$","");return text.length()>4000?text.substring(0,4000):text;}
+ static JSONObject analyze(String input)throws Exception{input=stripMetadata(input);String text=clean(input),lower=text.toLowerCase(Locale.ROOT);int best=0,second=0;String category="Без категории";for(String[] rule:RULES){int score=0;for(int i=1;i<rule.length;i++)if(lower.contains(rule[i]))score++;if(score>best){second=best;best=score;category=rule[0];}else if(score>second)second=score;}boolean confident=best>0&&best>second;if(!confident)category="Без категории";String title=decode(input).replace("\\n","\n").replaceAll("#[\\p{L}\\p{N}_]+","").trim();int sentence=title.indexOf('\n');if(sentence>10)title=title.substring(0,sentence);title=clean(title);title=title.replaceFirst("(?iu)^(?:city life is busy enough|life is busy enough|you need to see this|смотри до конца|обязательно посмотрите)[.!?…]* *","");String summary=title;Matcher purpose=Pattern.compile("(?iu)(?:связк[а-я]*|средств[а-я]*|упражнен[а-я]*|способ[а-я]*|лайфхак[а-я]*|совет[а-я]*) для (.+)").matcher(title);if(title.length()>45&&purpose.find())title="Для "+purpose.group(1);if(title.length()>64){int end=title.lastIndexOf(' ',61);title=title.substring(0,end>25?end:61)+"…";}if(summary.length()>220){int end=summary.lastIndexOf(' ',217);summary=summary.substring(0,end>70?end:217)+"…";}LinkedHashSet<String> tags=new LinkedHashSet<>();Matcher hashtags=Pattern.compile("#([\\p{L}\\p{N}_]{2,40})").matcher(text);while(hashtags.find()&&tags.size()<10){String tag=hashtags.group(1).toLowerCase(Locale.ROOT);if(!tag.matches("ww[0-9]+"))tags.add(tag);}if(lower.contains("волос"))tags.add("волосы");if(lower.contains("цинк")||lower.contains("аргинин")||lower.contains("добавк"))tags.add("добавки");if(lower.contains("сыворот"))tags.add("сыворотка");return new JSONObject().put("analysisVersion",2).put("title",title).put("description",input.trim()).put("summary",summary).put("category",category).put("confidence",confident?(best>=2?"high":"medium"):"low").put("tags",String.join(", ",tags));}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/Store.java
+========================================================================
+package com.reelkeep.app;
+import android.content.Context;import org.json.*;import java.util.*;import java.util.regex.*;import java.io.*;
+public class Store{
+ static Store shared;static synchronized Store shared(Context c){if(shared==null)shared=new Store(c.getApplicationContext());return shared;}
+ final Context c;Store(Context c){this.c=c;}
+ static void cleanCache(File f){File[] children=f.listFiles();if(children!=null)for(File child:children)cleanCache(child);f.delete();}
+ static String canonical(String text){return PlatformLinks.canonical(text);}
+ synchronized JSONObject load()throws Exception{String raw=c.getSharedPreferences("library",0).getString("catalog",null);JSONObject d=raw==null?new JSONObject().put("version",1).put("items",new JSONArray()).put("categories",new JSONArray(Arrays.asList("Без категории","Авто","Спорт","Еда","Дом и ремонт","Путешествия","Технологии","Работа и учёба","Здоровье","Деньги","Юмор","Идеи"))):new JSONObject(raw);if(d.optInt("version")<2){for(String category:new String[]{"Авто","Спорт","Еда","Дом и ремонт","Технологии","Работа и учёба","Здоровье","Деньги"})addCategory(d,category);d.put("version",2);commit(d);}if(d.optInt("version")<3){addCategory(d,"Красота и уход");d.put("version",3);commit(d);}return d;}
+ synchronized String read(){try{return load().toString();}catch(Exception e){return "{\"error\":\"Не удалось прочитать библиотеку\"}";}}
+ void commit(JSONObject d)throws Exception{if(!c.getSharedPreferences("library",0).edit().putString("catalog",d.toString()).commit())throw new IOException("Не удалось сохранить каталог");}
+ synchronized JSONObject find(String id)throws Exception{JSONArray a=load().getJSONArray("items");for(int i=0;i<a.length();i++)if(a.getJSONObject(i).getString("id").equals(id))return a.getJSONObject(i);throw new IOException("Запись не найдена");}
+ static String text(JSONObject o,String k,int max){String s=o.optString(k,"").trim();return s.substring(0,Math.min(s.length(),max));}
+ synchronized String save(JSONObject input)throws Exception{JSONObject d=load();JSONArray a=d.getJSONArray("items");String url=canonical(input.optString("url")),file=text(input,"file",80),id=text(input,"id",80);if(!file.matches("[a-f0-9-]{36}\\.mp4"))file="";if(url.isEmpty()&&file.isEmpty())throw new IOException("Добавь ссылку Instagram, Threads, YouTube или TikTok");int index=-1;JSONObject old=null;for(int i=0;i<a.length();i++){JSONObject x=a.getJSONObject(i);if(x.getString("id").equals(id)||(!url.isEmpty()&&url.equals(x.optString("url")))){index=i;old=x;break;}}if(old!=null&&file.isEmpty())file=old.optString("file");if(old!=null)for(String key:new String[]{"title","category","tags","note","description"})if(!input.has(key)&&old.has(key))input.put(key,old.get(key));String category=text(input,"category",60);if(category.isEmpty())category="Без категории";addCategory(d,category);String title=text(input,"title",160);if(title.isEmpty())title="Сохранённый Reels";JSONObject item=(old==null?new JSONObject():new JSONObject(old.toString())).put("id",old==null?UUID.randomUUID().toString():old.getString("id")).put("title",title).put("url",url).put("file",file).put("category",category).put("note",text(input,"note",5000)).put("tags",text(input,"tags",500)).put("favorite",input.optBoolean("favorite")).put("created",old==null?System.currentTimeMillis():old.getLong("created"));item.put("description",text(input,"description",5000).isEmpty()&&old!=null?old.optString("description"):text(input,"description",5000));if(old==null){item.put("titleLocked",!input.optBoolean("autoGenerated")&&!title.equals("Сохранённый Reels")&&!title.equals("Видео с телефона")).put("categoryLocked",!input.optBoolean("autoGenerated")&&!category.equals("Без категории")).put("tagsLocked",!input.optBoolean("autoGenerated")&&!text(input,"tags",500).isEmpty());}else{if(!title.equals(old.optString("title")))item.put("titleLocked",true);if(!category.equals(old.optString("category")))item.put("categoryLocked",!input.optBoolean("autoGenerated")&&!category.equals("Без категории"));if(!text(input,"tags",500).equals(old.optString("tags")))item.put("tagsLocked",true);}if(index<0)a.put(item);else a.put(index,item);commit(d);return item.toString();}
+ void addCategory(JSONObject d,String name)throws Exception{JSONArray cats=d.getJSONArray("categories");for(int i=0;i<cats.length();i++)if(name.equals(cats.getString(i)))return;if(cats.length()>=100)throw new IOException("Максимум 100 категорий");cats.put(name);}
+ synchronized long storageBytes(){long total=0;File[] files=c.getFilesDir().listFiles();if(files!=null)for(File f:files)if(f.getName().matches("[a-f0-9-]{36}\\.mp4"))total+=f.length();return total;}
+ synchronized void releaseFile(String id)throws Exception{JSONObject item=find(id);String file=item.optString("file");if(file.matches("[a-f0-9-]{36}\\.mp4")&&!new File(c.getFilesDir(),file).delete())throw new IOException("storage_failed");patch(id,new JSONObject().put("file","").put("downloadStatus","link_only"));}
+ synchronized String favorite(String id,boolean favorite)throws Exception{JSONObject data=load();JSONArray items=data.getJSONArray("items");for(int i=0;i<items.length();i++){JSONObject item=items.getJSONObject(i);if(!id.equals(item.optString("id")))continue;item.put("favorite",favorite);commit(data);return "{}";}throw new IOException("Video not found");}
+ synchronized void playback(String id,long position,long duration,boolean completed,long watchedAt)throws Exception{if(duration<=0)return;JSONObject data=load();JSONArray items=data.getJSONArray("items");for(int i=0;i<items.length();i++){JSONObject item=items.getJSONObject(i);if(!item.getString("id").equals(id))continue;item.put("watchPosition",completed?0:PlaybackState.clamp(position,duration)).put("watchDuration",Math.min(Integer.MAX_VALUE,duration)).put("watchCompleted",completed).put("lastWatched",watchedAt);commit(data);return;}}
+ synchronized void remove(String id)throws Exception{JSONObject d=load();JSONArray a=d.getJSONArray("items");String file="";for(int i=0;i<a.length();i++)if(a.getJSONObject(i).getString("id").equals(id)){file=a.getJSONObject(i).optString("file");a.remove(i);break;}commit(d);if(file.matches("[a-f0-9-]{36}\\.mp4"))new File(c.getFilesDir(),file).delete();if(id.matches("[a-f0-9-]{36}"))new File(new File(c.getFilesDir(),"thumbs"),id+".jpg").delete();}
+ synchronized void category(String action,String name,String next)throws Exception{name=name.trim();next=next.trim();if(name.isEmpty()||name.length()>60||next.length()>60)throw new IOException("Название: от 1 до 60 символов");JSONObject d=load();if(action.equals("add"))addCategory(d,name);else{if(name.equals("Без категории"))throw new IOException("Эта категория нужна для новых записей");if(action.equals("rename")&&next.isEmpty())throw new IOException("Введи новое название");JSONArray cats=d.getJSONArray("categories");for(int i=cats.length()-1;i>=0;i--)if(cats.getString(i).equals(name))cats.remove(i);if(action.equals("rename"))addCategory(d,next);JSONArray a=d.getJSONArray("items");for(int i=0;i<a.length();i++)if(a.getJSONObject(i).getString("category").equals(name))a.getJSONObject(i).put("category",action.equals("rename")?next:"Без категории");}commit(d);}
+ synchronized int bulk(JSONArray ids,String action,String category)throws Exception{Set<String> targets=new HashSet<>();for(int i=0;i<ids.length();i++)targets.add(ids.getString(i));if(!action.equals("delete")&&!action.equals("category"))throw new IOException("Неизвестное действие");category=category.trim();if(action.equals("category")&&(category.isEmpty()||category.length()>60))throw new IOException("Проверь категорию");JSONObject d=load();JSONArray items=d.getJSONArray("items");List<JSONObject> removed=new ArrayList<>();int count=0;if(action.equals("category"))addCategory(d,category);for(int i=items.length()-1;i>=0;i--){JSONObject item=items.getJSONObject(i);if(!targets.contains(item.getString("id")))continue;count++;if(action.equals("delete")){removed.add(item);items.remove(i);}else item.put("category",category).put("categoryLocked",true).put("suggestedCategory","");}commit(d);for(JSONObject item:removed){String file=item.optString("file"),id=item.getString("id");if(file.matches("[a-f0-9-]{36}\\.mp4"))new File(c.getFilesDir(),file).delete();if(id.matches("[a-f0-9-]{36}"))new File(new File(c.getFilesDir(),"thumbs"),id+".jpg").delete();}return count;}
+ synchronized void recover()throws Exception{File[] cache=c.getCacheDir().listFiles();if(cache!=null)for(File dir:cache)if(dir.getName().startsWith("transfer-"))cleanCache(dir);JSONObject d=load();JSONArray items=d.getJSONArray("items");for(int i=0;i<items.length();i++){JSONObject item=items.getJSONObject(i);if(item.optString("status").equals("loading")||item.optString("status").equals("queued"))item.put("status","unavailable");if(item.optString("downloadStatus").equals("downloading")||item.optString("downloadStatus").equals("queued"))item.put("downloadStatus","interrupted");}commit(d);File[] files=c.getFilesDir().listFiles();if(files!=null)for(File file:files)if(file.getName().matches("[a-f0-9-]{36}\\.mp4\\.part"))file.delete();}
+ synchronized void patch(String id,JSONObject patch)throws Exception{JSONObject d=load();JSONArray items=d.getJSONArray("items");for(int i=0;i<items.length();i++){JSONObject item=items.getJSONObject(i);if(!id.equals(item.getString("id")))continue;for(String key:new String[]{"status","downloadStatus","file","confidence","analyzer","suggestedCategory","errorReason","coverError","analysisVersion","videoUrl","videoPreparedAt","downloadEngine","source","sourceId","ocrText"})if(patch.has(key))item.put(key,patch.get(key));if(!patch.optString("summary").isEmpty())item.put("summary",text(patch,"summary",500));String description=patch.optString("description");if(!description.isEmpty())item.put("description",description);if(patch.optBoolean("thumb")||patch.optBoolean("thumbManual"))item.put("thumb",true).put("thumbVersion",System.currentTimeMillis());if(patch.optBoolean("thumbManual"))item.put("thumbManual",true).put("thumbSource","manual");String coverSource=patch.optString("thumbSource");if(coverSource.equals("instagram")||coverSource.equals("frame")||coverSource.equals("manual"))item.put("thumbSource",coverSource).put("thumbManual",coverSource.equals("manual"));String title=patch.optString("title");boolean generic=item.optString("title").equals("Сохранённый Reels")||item.optString("title").equals("Видео с телефона");if(!title.isEmpty()&&!item.optBoolean("titleLocked"))item.put("title",title);if(!patch.optString("tags").isEmpty()&&!item.optBoolean("tagsLocked"))item.put("tags",patch.getString("tags"));String category=patch.optString("category");if(!category.isEmpty()&&!item.optBoolean("categoryLocked")){boolean confident=patch.optString("confidence").equals("high")&&!category.equals("Без категории");item.put("suggestedCategory",category.equals("Без категории")?"":category);if(confident){addCategory(d,category);item.put("category",category);}else item.put("category","Без категории");}items.put(i,item);commit(d);return;}throw new IOException("Запись удалена");}
+ synchronized int restore(JSONObject incoming,File stage)throws Exception{JSONObject d=load();JSONArray existing=d.getJSONArray("items"),items=incoming.getJSONArray("items");if(items.length()>10000)throw new IOException("Слишком много записей");List<File> created=new ArrayList<>();int changed=0;try{JSONArray cats=incoming.optJSONArray("categories");if(cats!=null)for(int k=0;k<cats.length();k++){String name=cats.optString(k).trim();if(!name.isEmpty()&&name.length()<=60)addCategory(d,name);}for(int i=0;i<items.length();i++){JSONObject input=items.getJSONObject(i);String url=canonical(input.optString("url")),file=input.optString("file"),sourceId=input.optString("id");String identity=input.optString("backupSourceId",sourceId);boolean media=file.matches("[a-f0-9-]{36}\\.mp4")&&new File(stage,"videos/"+file).isFile();if(url.isEmpty()&&!media)continue;JSONObject item=null;for(int j=0;j<existing.length();j++)if((!url.isEmpty()&&url.equals(existing.getJSONObject(j).optString("url")))||(url.isEmpty()&&identity.matches("[a-f0-9-]{36}")&&(identity.equals(existing.getJSONObject(j).optString("backupSourceId"))||identity.equals(existing.getJSONObject(j).optString("id"))))){item=existing.getJSONObject(j);break;}boolean fresh=item==null;if(fresh){item=new JSONObject();String title=text(input,"title",160),category=text(input,"category",60);if(category.isEmpty())category="Без категории";addCategory(d,category);item.put("id",UUID.randomUUID().toString()).put("backupSourceId",identity).put("url",url).put("title",title.isEmpty()?"Сохранённый Reels":title).put("category",category).put("file","").put("created",input.optLong("created",System.currentTimeMillis())).put("favorite",input.optBoolean("favorite"));for(String key:new String[]{"note","description","summary","tags","ocrText"})item.put(key,text(input,key,key.equals("tags")?500:5000));for(String key:new String[]{"titleLocked","categoryLocked","tagsLocked","watchCompleted"})item.put(key,input.optBoolean(key));for(String key:new String[]{"watchPosition","watchDuration","lastWatched"})item.put(key,Math.max(0,input.optLong(key)));existing.put(item);}boolean filled=false;if(media&&(item.optString("file").isEmpty()||!new File(c.getFilesDir(),item.optString("file")).isFile())){File target=new File(c.getFilesDir(),UUID.randomUUID()+".mp4");copyArchiveFile(new File(stage,"videos/"+file),target);created.add(target);item.put("file",target.getName()).put("downloadStatus","local");filled=true;}if(!item.optBoolean("thumb")&&sourceId.matches("[a-f0-9-]{36}")&&new File(stage,"thumbs/"+sourceId+".jpg").isFile()){File folder=new File(c.getFilesDir(),"thumbs");folder.mkdirs();File target=new File(folder,item.getString("id")+".jpg");copyArchiveFile(new File(stage,"thumbs/"+sourceId+".jpg"),target);created.add(target);item.put("thumb",true).put("thumbManual",input.optBoolean("thumbManual")).put("thumbSource",CoverPolicy.source(input)).put("thumbVersion",System.currentTimeMillis());filled=true;}if(fresh||filled)changed++;}commit(d);return changed;}catch(Exception e){for(File file:created)file.delete();throw e;}}
+ static void copyArchiveFile(File source,File target)throws Exception{try(InputStream in=new FileInputStream(source);OutputStream out=new FileOutputStream(target)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)out.write(b,0,n);}catch(Exception e){target.delete();throw e;}}
+ synchronized int merge(String raw)throws Exception{JSONObject incoming=new JSONObject(raw);JSONArray a=incoming.getJSONArray("items");if(a.length()>10000)throw new IOException("Слишком много записей");int count=0;for(int i=0;i<a.length();i++){JSONObject item=new JSONObject(a.getJSONObject(i).toString());if(canonical(item.optString("url")).isEmpty())continue;item.remove("id");item.put("file","");JSONObject existing=load();boolean duplicate=false;JSONArray old=existing.getJSONArray("items");for(int j=0;j<old.length();j++)if(old.getJSONObject(j).optString("url").equals(canonical(item.optString("url"))))duplicate=true;if(!duplicate){save(item);count++;}}return count;}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/SurfaceLighting.java
+========================================================================
+package com.reelkeep.app;
+import android.content.Context;import android.hardware.*;import android.animation.ValueAnimator;import java.util.*;
+/** Tilt light updates only registered material backgrounds, never the video surface. */
+final class SurfaceLighting implements SensorEventListener{
+ float x=-.35f,y=-.94f,smoothedX,smoothedZ;long lastUpdate;boolean started;final SensorManager manager;final Sensor sensor;final List<ControlSurface> surfaces=new ArrayList<>();
+ SurfaceLighting(Context c){manager=(SensorManager)c.getSystemService(Context.SENSOR_SERVICE);Sensor available=manager==null?null:manager.getDefaultSensor(Sensor.TYPE_GRAVITY);sensor=available!=null?available:manager==null?null:manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);}
+ void add(ControlSurface surface){surfaces.add(surface);}void start(){if(started||sensor==null||!ValueAnimator.areAnimatorsEnabled())return;started=manager.registerListener(this,sensor,SensorManager.SENSOR_DELAY_UI);}void stop(){if(started)manager.unregisterListener(this);started=false;}
+ public void onAccuracyChanged(Sensor s,int accuracy){}
+ public void onSensorChanged(SensorEvent event){smoothedX+=(clamp(event.values[0]/9.81f)-smoothedX)*.15f;smoothedZ+=(clamp(event.values[2]/9.81f)-smoothedZ)*.15f;long now=android.os.SystemClock.elapsedRealtime();if(now-lastUpdate<70)return;lastUpdate=now;float a=-.35f+smoothedX*.7f,b=-.94f+(smoothedZ-.5f)*.45f;float length=Math.max(.001f,(float)Math.hypot(a,b));a/=length;b/=length;if(Math.abs(a-x)<.015f&&Math.abs(b-y)<.015f)return;x=a;y=b;for(ControlSurface surface:surfaces)surface.invalidateSelf();}
+ static float clamp(float value){return Math.max(-1,Math.min(1,value));}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/ThreadsMedia.java
+========================================================================
+package com.reelkeep.app;
+
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.regex.*;
+import org.json.*;
+
+/** Public Threads page data. The requested post is selected before its attachment is followed. */
+final class ThreadsMedia {
+    static boolean host(URL url) {
+        String h = url.getHost().toLowerCase(Locale.ROOT);
+        return url.getProtocol().equals("https") && url.getUserInfo() == null && url.getPort() == -1 &&
+                (h.equals("threads.com") || h.equals("www.threads.com") || h.equals("threads.net") || h.equals("www.threads.net"));
+    }
+
+    static String page(String input) throws Exception {
+        URL url = new URL(input);
+        for (int redirect = 0; redirect < 5; redirect++) {
+            if (!host(url)) throw new IOException("unsupported_host");
+            if (url.getPath().startsWith("/login") || url.getPath().startsWith("/accounts/"))
+                throw new IOException("source_login_required");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(12000); connection.setReadTimeout(18000);
+            connection.setInstanceFollowRedirects(false);
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+            connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8");
+            connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9");
+            connection.setRequestProperty("Sec-Fetch-Dest", "document");
+            connection.setRequestProperty("Sec-Fetch-Mode", "navigate");
+            connection.setRequestProperty("Sec-Fetch-Site", "none");
+            connection.setRequestProperty("Upgrade-Insecure-Requests", "1");
+            // No Instagram account cookies or other session data are sent.
+            try {
+                int code = connection.getResponseCode();
+                if (code >= 300 && code < 400) {
+                    String location = connection.getHeaderField("Location");
+                    if (location == null) throw new IOException("redirect_missing");
+                    url = new URL(url, location); continue;
+                }
+                if (code == 401 || code == 403) throw new IOException("source_login_required");
+                if (code == 404 || code == 410) throw new IOException("source_unavailable");
+                if (code != 200) throw new IOException("http_" + code);
+                try (InputStream in = connection.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                    byte[] block = new byte[16384]; int n;
+                    while ((n = in.read(block)) != -1) {
+                        if (out.size() + n > 2500000) throw new IOException("response_too_large");
+                        out.write(block, 0, n);
+                    }
+                    return out.toString("UTF-8");
+                }
+            } finally { connection.disconnect(); }
+        }
+        throw new IOException("too_many_redirects");
+    }
+
+    static JSONObject metadata(String url) throws Exception {
+        JSONObject result = parse(page(url), url);
+        // Occasionally a public page is sent without its media preloader. Try one locale variant,
+        // but never replace a correctly matched text-only post with a recommended video.
+        if (!result.optBoolean("threadsPostMatched")) {
+            try {
+                JSONObject retry = parse(page(url + "?hl=en"), url);
+                if (retry.optBoolean("threadsPostMatched")) return retry;
+            } catch (Exception ignored) {}
+        }
+        return result;
+    }
+
+    static JSONObject parse(String html, String input) throws Exception {
+        String canonical = PlatformLinks.canonical(input);
+        if (!PlatformLinks.source(canonical).equals("threads")) throw new IOException("unsupported_source");
+        String code = canonical.substring(canonical.lastIndexOf('/') + 1);
+        JSONObject post = null;
+        Matcher scripts = Pattern.compile("<script\\b([^>]*)>(.*?)</script>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL).matcher(html);
+        while (scripts.find() && post == null) {
+            if (!scripts.group(1).toLowerCase(Locale.ROOT).contains("application/json") || !scripts.group(2).contains(code)) continue;
+            try { post = find(new JSONTokener(scripts.group(2)).nextValue(), code); }
+            catch (JSONException ignored) {}
+        }
+        Map<String, String> meta = Smart.meta(html);
+        String caption = post == null ? Smart.caption(meta) : caption(post);
+        JSONObject media = post == null ? null : attachment(post, 0);
+        String video = media == null ? "" : video(media);
+        String image = media == null ? "" : image(media);
+        if (image.isEmpty()) image = meta.containsKey("og:image") ? meta.get("og:image") : "";
+        if (media != null && media != post) {
+            String quoted = caption(media);
+            if (!quoted.isEmpty() && !caption.contains(quoted)) caption = caption.isEmpty() ? quoted : caption + "\n\n" + quoted;
+        }
+        JSONObject result = Smart.analyze(caption);
+        return result.put("source", "threads").put("sourceId", code).put("downloadEngine", "threads-public").put("imageUrl", image).put("threadsPostMatched", post != null)
+                .put("videoUrl", video).put("status", !caption.isEmpty() ? "metadata" : !image.isEmpty() ? "cover_only" : "unavailable")
+                .put("errorReason", video.isEmpty() ? "video_unavailable" : "");
+    }
+
+    private static JSONObject find(Object root, String code) throws JSONException {
+        ArrayDeque<Object> queue = new ArrayDeque<>(); queue.add(root);
+        for (int visited = 0; !queue.isEmpty() && visited < 100000; visited++) {
+            Object node = queue.removeFirst();
+            if (node instanceof JSONObject) {
+                JSONObject o = (JSONObject) node;
+                if ((code.equals(o.optString("code")) || code.equals(o.optString("shortcode"))) &&
+                        (o.has("video_versions") || o.has("carousel_media") || o.has("text_post_app_info"))) return o;
+                Iterator<String> keys = o.keys();
+                while (keys.hasNext()) { Object value = o.get(keys.next()); if (value instanceof JSONObject || value instanceof JSONArray) queue.addLast(value); }
+            } else if (node instanceof JSONArray) {
+                JSONArray a = (JSONArray) node;
+                for (int i = 0; i < a.length(); i++) { Object value = a.get(i); if (value instanceof JSONObject || value instanceof JSONArray) queue.addLast(value); }
+            }
+        }
+        return null;
+    }
+
+    private static JSONObject attachment(JSONObject post, int depth) throws Exception {
+        if (depth > 6) return null;
+        if (!video(post).isEmpty()) return post;
+        JSONArray album = post.optJSONArray("carousel_media");
+        if (album != null) for (int i = 0; i < album.length(); i++) {
+            JSONObject child = album.optJSONObject(i);
+            JSONObject found = child == null ? null : attachment(child, depth + 1);
+            if (found != null) return found;
+        }
+        JSONObject info = post.optJSONObject("text_post_app_info");
+        JSONObject share = info == null ? null : info.optJSONObject("share_info");
+        JSONObject quoted = share == null ? null : share.optJSONObject("quoted_attachment_post");
+        return quoted == null ? null : attachment(quoted, depth + 1);
+    }
+
+    private static String caption(JSONObject post) {
+        JSONObject caption = post.optJSONObject("caption");
+        return caption == null ? "" : caption.optString("text").trim();
+    }
+
+    private static String video(JSONObject media) {
+        JSONArray versions = media.optJSONArray("video_versions");
+        if (versions != null) for (int i = 0; i < versions.length(); i++) {
+            JSONObject version = versions.optJSONObject(i); String url = version == null ? "" : version.optString("url");
+            try { if (WebMedia.allowed(new URL(url), true)) return url; } catch (Exception ignored) {}
+        }
+        return "";
+    }
+
+    private static String image(JSONObject media) {
+        JSONObject images = media.optJSONObject("image_versions2");
+        JSONArray versions = images == null ? null : images.optJSONArray("candidates");
+        if (versions != null) for (int i = 0; i < versions.length(); i++) {
+            JSONObject version = versions.optJSONObject(i); String url = version == null ? "" : version.optString("url");
+            try { if (WebMedia.allowed(new URL(url), true)) return url; } catch (Exception ignored) {}
+        }
+        return "";
+    }
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/TransferService.java
+========================================================================
+package com.reelkeep.app;
+import android.app.*;import android.content.*;import android.os.*;import org.json.*;
+/** Keeps transfers visible and process-important while the app is in the background. */
+public final class TransferService extends Service{
+ static final int ID=71;final Handler handler=new Handler();android.os.PowerManager.WakeLock wake;android.net.ConnectivityManager cm;android.net.ConnectivityManager.NetworkCallback network;
+ static void ensure(Context c){try{c.startForegroundService(new Intent(c,TransferService.class));}catch(RuntimeException ignored){}}
+ public void onCreate(){super.onCreate();NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);nm.createNotificationChannel(new NotificationChannel("downloads","Video downloads",NotificationManager.IMPORTANCE_LOW));android.os.PowerManager power=(android.os.PowerManager)getSystemService(POWER_SERVICE);wake=power.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK,"Reelkeep:transfer");wake.acquire(25*60*1000L);startForeground(ID,notification(0));cm=(android.net.ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);network=new android.net.ConnectivityManager.NetworkCallback(){public void onAvailable(android.net.Network net){NetworkGate.resumeWaiting(TransferService.this);}public void onCapabilitiesChanged(android.net.Network net,android.net.NetworkCapabilities cap){NetworkGate.resumeWaiting(TransferService.this);}};cm.registerDefaultNetworkCallback(network);handler.postDelayed(tick,1200);}
+ Notification notification(int count){Intent open=new Intent(this,MainActivity.class);PendingIntent pi=PendingIntent.getActivity(this,1,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);Intent stop=new Intent(this,TransferService.class).setAction("cancel");PendingIntent cancel=PendingIntent.getService(this,2,stop,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);return new Notification.Builder(this,"downloads").setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle("Reelkeep").setContentText(Lang.text(this,"Скачивание видео")+(count>0?" · "+count:"")).setContentIntent(pi).setOngoing(true).setOnlyAlertOnce(true).addAction(new Notification.Action.Builder(null,Lang.text(this,"Отменить загрузки"),cancel).build()).build();}
+ final Runnable tick=new Runnable(){public void run(){NetworkGate.resumeWaiting(TransferService.this);if(!MediaDepot.pending()&&!NetworkGate.waiting(TransferService.this)){stopForeground(true);stopSelf();return;}((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(ID,notification(MediaDepot.downloads.snapshot().size()));handler.postDelayed(this,1500);}};
+ public int onStartCommand(Intent i,int flags,int id){if(i!=null&&"cancel".equals(i.getAction())){for(DownloadQueue.Job j:MediaDepot.downloads.snapshot())MediaDepot.downloads.cancel(j.id);try{JSONArray items=new JSONObject(Store.shared(this).read()).getJSONArray("items");for(int n=0;n<items.length();n++){JSONObject item=items.getJSONObject(n);if(item.optString("downloadStatus").equals("waiting_network")||item.optString("status").equals("loading")&&item.optString("file").isEmpty())Store.shared(this).patch(item.getString("id"),new JSONObject().put("downloadStatus","cancelled").put("errorReason","download_cancelled"));}}catch(Exception ignored){}}return START_NOT_STICKY;}
+ public IBinder onBind(Intent intent){return null;}public void onDestroy(){handler.removeCallbacks(tick);if(cm!=null&&network!=null)try{cm.unregisterNetworkCallback(network);}catch(Exception ignored){}if(wake!=null&&wake.isHeld())wake.release();super.onDestroy();}
+}
+
+
+========================================================================
+FILE: app/src/com/reelkeep/app/VideoShareProvider.java
+========================================================================
+package com.reelkeep.app;
+
+import android.content.*;
+import android.database.*;
+import android.net.Uri;
+import android.os.ParcelFileDescriptor;
+import android.provider.OpenableColumns;
+import java.io.*;
+
+/** Only saved catalog videos; no arbitrary paths, private metadata or write access. */
+public final class VideoShareProvider extends ContentProvider {
+    public boolean onCreate(){return true;}
+    @Override public ParcelFileDescriptor openFile(Uri uri,String mode)throws FileNotFoundException {
+        if(!"r".equals(mode))throw new FileNotFoundException("Read only");
+        return ParcelFileDescriptor.open(VideoSharing.file(getContext(),uri),ParcelFileDescriptor.MODE_READ_ONLY);
+    }
+    public String getType(Uri uri){try{VideoSharing.id(getContext(),uri);return VideoSharing.MIME;}catch(IOException e){throw new IllegalArgumentException("Unknown video");}}
+    public Cursor query(Uri uri,String[] projection,String selection,String[] args,String order){
+        try{
+            File file=VideoSharing.file(getContext(),uri);
+            String[] columns=projection==null?new String[]{OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE}:projection;
+            MatrixCursor cursor=new MatrixCursor(columns,1);Object[] row=new Object[columns.length];
+            for(int i=0;i<columns.length;i++){
+                if(OpenableColumns.DISPLAY_NAME.equals(columns[i]))row[i]=VideoSharing.filename(VideoSharing.item(getContext(),uri));
+                else if(OpenableColumns.SIZE.equals(columns[i]))row[i]=file.length();
+            }
+            cursor.addRow(row);return cursor;
+        }catch(IOException e){return null;}
+    }
+    public Uri insert(Uri uri,ContentValues values){throw new UnsupportedOperationException("Read only");}
+    public int delete(Uri uri,String selection,String[] args){throw new UnsupportedOperationException("Read only");}
+    public int update(Uri uri,ContentValues values,String selection,String[] args){throw new UnsupportedOperationException("Read only");}
+}
+
