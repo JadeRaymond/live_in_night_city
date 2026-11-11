@@ -1,28 +1,35 @@
-# Reelkeep 1.23 — source review export
+# Reelkeep 1.23 — external build support
 
-Sanitized review snapshot, published at the user's request. Main application package: com.reelkeep.app.
+[Download build support ZIP](https://raw.githubusercontent.com/JadeRaymond/live_in_night_city/reelkeep-build-support-1.23/Reelkeep-1.23-build-support.zip)
 
-## Download
+[Original source review ZIP](https://raw.githubusercontent.com/JadeRaymond/live_in_night_city/reelkeep-source-review-1.23/Reelkeep-1.23-source-review.zip)
 
-[Reelkeep-1.23-source-review.zip](Reelkeep-1.23-source-review.zip?raw=true)
+Extract both ZIPs into the same directory: both use the root folder `Reelkeep-source-review-1.23/`.
 
-ZIP: 71,843 bytes. SHA-256: a080280f00f3d4931404d2ca3e228c228d1d070c53e7794c24ee149082e1881e
+## Commands
 
-Contains all 33 Java sources, original AndroidManifest.xml, complete res/, sanitized build.sh and BUILD.md. No keystore, password values, cookies, account sessions, binary dependencies or build output.
+Requires Linux x86_64, Python 3.9+, JDK 17+ (tested on 21), Bash and zip.
 
-## Text access for reviewers and AI assistants
+```sh
+python3 setup-tools.py
+bash check-java.sh
+```
 
-These UTF-8 text files contain the exact same exported files, with FILE: path boundaries. No archive extraction is required.
+This installs pinned SDK/build tools, ECJ, ONNX and Tesseract Java APIs and compiles all Java, Android resources and DEX. Downloaded dependency hashes are verified. No key/password/session is supplied.
 
-- [SOURCE-01.txt](SOURCE-01.txt) — read first
-- [SOURCE-02.txt](SOURCE-02.txt) — read second
-- [SOURCE-03.txt](SOURCE-03.txt) — read third
+## Full APK with runtime resources
 
-Raw text URLs:
-- https://raw.githubusercontent.com/JadeRaymond/live_in_night_city/reelkeep-source-review-1.23/SOURCE-01.txt
-- https://raw.githubusercontent.com/JadeRaymond/live_in_night_city/reelkeep-source-review-1.23/SOURCE-02.txt
-- https://raw.githubusercontent.com/JadeRaymond/live_in_night_city/reelkeep-source-review-1.23/SOURCE-03.txt
+The previous review export intentionally excluded app/assets and native libraries. Tools alone cannot recreate them. Also supply the original Reelkeep 1.23 installer APK as a local file:
 
-The build script uses external signing environment variables. Build prerequisites and excluded assets are documented in BUILD.md inside the ZIP and text export.
+```sh
+python3 restore-runtime.py /path/to/Reelkeep-1.23.apk
+bash build-unsigned.sh
+```
 
-This branch is only a review export; it is not the application's full runtime environment.
+Runtime restoration verifies the known baseline APK hash and extracts only assets and ARM64 libraries. It does not overwrite edited Java or extract decompiled Java. Result: `build/reelkeep-unsigned.apk`.
+
+For installation the reviewer must sign using their own key; their signature cannot update the installed production build. The production signing key remains private.
+
+[Full Russian instructions](BUILD-TOOLS.md)
+
+Verified in a separate clean source directory, using checksum-verified cached dependency archives: Java and DEX compilation, full unsigned APK packaging and ZIP CRC checks passed. A full new network download was not repeated.
